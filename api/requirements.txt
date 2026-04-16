@@ -1,6 +1,10 @@
 # ============================================================
-# MARAMARA API - Python Dependencies
+# MARAMARA API - Python Dependencies (slim edition)
 # Python 3.11 (conda env: KARNAF)
+#
+# ML inference runs via HTTP APIs (OpenAI Whisper, Claude).
+# Heavy local ML (torch/whisper/speechbrain) can be re-added
+# later via a separate worker image if needed.
 # ============================================================
 
 # ----- Web framework -----
@@ -8,7 +12,7 @@ Flask>=3.0.0
 Flask-Cors>=4.0.0
 Flask-Limiter>=3.5.0
 gunicorn>=21.2.0
-waitress>=2.1.2  # Windows dev
+waitress>=2.1.2
 
 # ----- Validation -----
 pydantic>=2.5.0
@@ -32,7 +36,7 @@ rq>=1.15.1
 redis>=5.0.1
 APScheduler>=3.10.4
 
-# ----- AI / LLM -----
+# ----- AI / LLM (cloud APIs only) -----
 anthropic>=0.40.0
 openai>=1.50.0
 google-generativeai>=0.8.0
@@ -42,24 +46,13 @@ langchain>=0.3.0
 langchain-anthropic>=0.3.0
 langchain-openai>=0.2.0
 
-# ----- Voice / Audio ML -----
-torch>=2.1.0
-torchaudio>=2.1.0
-faster-whisper>=1.0.3
-silero-vad>=5.1.2
-speechbrain>=1.0.0
-resemblyzer>=0.1.4
+# ----- Audio (lightweight - no torch) -----
 numpy>=1.26.0
 scipy>=1.11.0
-librosa>=0.10.1
 soundfile>=0.12.1
 pydub>=0.25.1
 
-# ----- NLP (Hebrew + English) -----
-transformers>=4.40.0
-sentence-transformers>=2.7.0
-spacy>=3.7.0
-nltk>=3.8.1
+# ----- NLP helpers (no transformers) -----
 langdetect>=1.0.9
 
 # ----- Utilities -----
@@ -73,7 +66,7 @@ rich>=13.7.0
 click>=8.1.7
 tenacity>=8.2.3
 
-# ----- PDF (therapist reports) -----
+# ----- PDF reports -----
 reportlab>=4.0.7
 weasyprint>=60.2
 
@@ -82,13 +75,9 @@ pytest>=8.0.0
 pytest-flask>=1.3.0
 pytest-asyncio>=0.23.0
 pytest-cov>=4.1.0
-httpx>=0.27.0
 factory-boy>=3.3.0
 faker>=22.0.0
 
 # ----- Dev tools -----
 black>=24.1.0
 ruff>=0.1.14
-mypy>=1.8.0
-pre-commit>=3.6.0
-ipython>=8.20.0

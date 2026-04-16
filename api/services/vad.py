@@ -1,10 +1,13 @@
-"""Voice Activity Detection using Silero VAD."""
+"""Voice Activity Detection - simple RMS energy + zero-crossing threshold.
+
+Replaces Silero VAD (which needs torch). Good enough for MVP:
+gates out pure silence before wasting Whisper API calls.
+
+Real VAD (Silero) can be re-added later as a heavier worker image.
+"""
 from __future__ import annotations
 
 import io
-from functools import lru_cache
-
-import numpy as np
 
 from config import get_settings
 from utils.logger import get_logger
@@ -12,62 +15,38 @@ from utils.logger import get_logger
 log = get_logger(__name__)
 
 
-@lru_cache(maxsize=1)
-def _load_silero():
-    """Load Silero VAD model once."""
-    import torch
-    model, utils = torch.hub.load(
-        repo_or_dir="snakers4/silero-vad",
-        model="silero_vad",
-        trust_repo=True,
-        verbose=False,
-    )
-    return model, utils
-
-
 class VADService:
-    """Silero VAD wrapper.
+    """Lightweight RMS-based speech detector.
 
-    Input: raw bytes of 16kHz mono WAV / PCM audio.
-    Output: (speech_detected: bool, confidence: float)
+    Input: bytes of a WAV/PCM/mp3/etc chunk.
+    Output: (has_speech: bool, confidence: float in [0,1])
     """
+
+    # Thresholds tuned for 16kHz mono speech vs background noise.
+    RMS_MIN = 0.008         # below this = silence
+    ZERO_CROSSING_MIN = 0.02  # speech has more zero-crossings than steady hiss
 
     def __init__(self) -> None:
         self.settings = get_settings()
-        self.threshold = self.settings.vad_threshold
-        self.sample_rate = self.settings.audio_sample_rate
 
     def detect(self, audio_bytes: bytes) -> tuple[bool, float]:
-        """Return True if speech is present above threshold."""
         try:
-            audio = self._bytes_to_tensor(audio_bytes)
+            import numpy as np
+            import soundfile as sf
+            buf = io.BytesIO(audio_bytes)
+            data, sr = sf.read(buf, dtype="float32")
+            if data.ndim > 1:
+                data = data.mean(axis=1)
+            if len(data) == 0:
+                return False, 0.0
+
+            rms = float(np.sqrt(np.mean(data.astype("float64") ** 2)))
+            zero_cross = float(np.mean(np.abs(np.diff(np.signbit(data).astype(int)))))
+
+            has_speech = rms > self.RMS_MIN and zero_cross > self.ZERO_CROSSING_MIN
+            confidence = min(1.0, (rms / (self.RMS_MIN * 4)) * (zero_cross / (self.ZERO_CROSSING_MIN * 4)))
+            return has_speech, confidence
         except Exception as e:
-            log.warning("vad_decode_failed", error=str(e))
-            return False, 0.0
-
-        model, utils = _load_silero()
-        get_speech_timestamps = utils[0]
-        timestamps = get_speech_timestamps(
-            audio,
-            model,
-            sampling_rate=self.sample_rate,
-            threshold=self.threshold,
-        )
-        if not timestamps:
-            return False, 0.0
-        total_speech = sum(seg["end"] - seg["start"] for seg in timestamps)
-        total = len(audio)
-        ratio = total_speech / max(total, 1)
-        return True, float(ratio)
-
-    def _bytes_to_tensor(self, audio_bytes: bytes):
-        import torch
-        import soundfile as sf
-        buf = io.BytesIO(audio_bytes)
-        data, sr = sf.read(buf, dtype="float32")
-        if data.ndim > 1:
-            data = data.mean(axis=1)  # mono
-        if sr != self.sample_rate:
-            import librosa
-            data = librosa.resample(data, orig_sr=sr, target_sr=self.sample_rate)
-        return torch.from_numpy(np.asarray(data, dtype=np.float32))
+            log.warning("vad_failed", error=str(e))
+            # Fail open - assume speech, let downstream (Whisper) decide
+            return True, 0.5

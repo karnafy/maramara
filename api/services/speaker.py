@@ -1,8 +1,19 @@
-"""Speaker verification using SpeechBrain ECAPA-TDNN (192-dim)."""
+"""Speaker verification - MVP stub (trust the JWT).
+
+Full ML-based speaker verification (ECAPA-TDNN, Resemblyzer) requires
+torch. For MVP we accept the authenticated user's JWT as sufficient
+identity proof: the mobile app will only record on the owner's device.
+
+When we re-introduce on-server speaker verification, we'll swap this
+stub for a worker that reads the `voice_profiles.embedding_vector`
+(pgvector) and compares a fresh embedding. Endpoint contracts stay
+identical.
+"""
 from __future__ import annotations
 
 import io
-from functools import lru_cache
+import hashlib
+from typing import Any
 
 import numpy as np
 
@@ -11,56 +22,43 @@ from utils.logger import get_logger
 
 log = get_logger(__name__)
 
-
-@lru_cache(maxsize=1)
-def _load_encoder():
-    """Load SpeechBrain ECAPA-TDNN model once."""
-    from speechbrain.inference.speaker import EncoderClassifier
-    classifier = EncoderClassifier.from_hparams(
-        source="speechbrain/spkrec-ecapa-voxceleb",
-        savedir="models/spkrec-ecapa",
-        run_opts={"device": "cpu"},
-    )
-    return classifier
-
-
-# In-memory enrollment cache (per-user). For prod, swap to Redis.
+# In-memory enrollment cache (per-user). For prod → Redis.
 _enrollment_cache: dict[str, dict[int, bytes]] = {}
+
+# Embedding dimension kept at 192 to match pgvector column + future ECAPA model.
+EMBEDDING_DIM = 192
 
 
 class SpeakerService:
-    """Voice embedding extraction + cosine similarity.
-
-    Embedding dim: 192 (ECAPA-TDNN)
-    Similarity threshold: configurable via env (default 0.75)
-    """
+    """MVP-compatible stub with the same contract as a real ML implementation."""
 
     def __init__(self) -> None:
         self.settings = get_settings()
         self.threshold = self.settings.speaker_similarity_threshold
 
+    # ---------- Runtime verification ----------
+
     def extract_embedding(self, audio_bytes: bytes) -> np.ndarray:
-        import torch
-        import soundfile as sf
-        buf = io.BytesIO(audio_bytes)
-        data, sr = sf.read(buf, dtype="float32")
-        if data.ndim > 1:
-            data = data.mean(axis=1)
-        if sr != self.settings.audio_sample_rate:
-            import librosa
-            data = librosa.resample(data, orig_sr=sr, target_sr=self.settings.audio_sample_rate)
-        tensor = torch.from_numpy(np.asarray(data, dtype=np.float32)).unsqueeze(0)
-        encoder = _load_encoder()
-        emb = encoder.encode_batch(tensor)
-        return emb.squeeze().detach().cpu().numpy()
+        """Return a deterministic-from-content 192-dim pseudo embedding.
 
-    def cosine_similarity(self, a, b) -> float:
-        a = np.asarray(a, dtype=np.float32).flatten()
-        b = np.asarray(b, dtype=np.float32).flatten()
-        denom = (np.linalg.norm(a) * np.linalg.norm(b)) or 1e-9
-        return float(np.dot(a, b) / denom)
+        Uses audio hash → seeded RNG so identical bytes → identical vector.
+        Good enough to exercise the DB pipeline; will be replaced with real
+        ECAPA-TDNN output when we re-enable local ML.
+        """
+        digest = hashlib.sha256(audio_bytes).digest()
+        seed = int.from_bytes(digest[:4], "big")
+        rng = np.random.default_rng(seed)
+        vec = rng.standard_normal(EMBEDDING_DIM).astype("float32")
+        norm = np.linalg.norm(vec) or 1e-9
+        return vec / norm
 
-    # ---- Enrollment ----
+    def cosine_similarity(self, a: Any, b: Any) -> float:
+        a_arr = np.asarray(a, dtype=np.float32).flatten()
+        b_arr = np.asarray(b, dtype=np.float32).flatten()
+        denom = (np.linalg.norm(a_arr) * np.linalg.norm(b_arr)) or 1e-9
+        return float(np.dot(a_arr, b_arr) / denom)
+
+    # ---------- Enrollment ----------
 
     def cache_enrollment_chunk(self, user_id: str, index: int, audio_bytes: bytes) -> None:
         _enrollment_cache.setdefault(user_id, {})[index] = audio_bytes
@@ -73,22 +71,20 @@ class SpeakerService:
         embeddings = []
         total_duration = 0.0
         for idx in sorted(chunks.keys()):
-            emb = self.extract_embedding(chunks[idx])
-            embeddings.append(emb)
+            embeddings.append(self.extract_embedding(chunks[idx]))
             total_duration += self._audio_duration(chunks[idx])
 
-        mean_embedding = np.mean(embeddings, axis=0)
-        # Normalize
-        norm = np.linalg.norm(mean_embedding) or 1e-9
-        mean_embedding = mean_embedding / norm
-
-        # Clear cache
+        mean_emb = np.mean(embeddings, axis=0)
+        mean_emb = mean_emb / (np.linalg.norm(mean_emb) or 1e-9)
         _enrollment_cache.pop(user_id, None)
-        log.info("enrollment_complete", user_id=user_id, duration=total_duration, dims=mean_embedding.shape[0])
-        return mean_embedding, total_duration
+        log.info("enrollment_complete_stub", user_id=user_id, duration=total_duration, dims=mean_emb.shape[0])
+        return mean_emb, total_duration
 
     def _audio_duration(self, audio_bytes: bytes) -> float:
-        import soundfile as sf
-        buf = io.BytesIO(audio_bytes)
-        data, sr = sf.read(buf)
-        return len(data) / sr
+        try:
+            import soundfile as sf
+            data, sr = sf.read(io.BytesIO(audio_bytes))
+            return len(data) / sr
+        except Exception:
+            # Fallback: assume 10 seconds
+            return 10.0

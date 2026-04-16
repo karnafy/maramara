@@ -19,46 +19,184 @@
 
   <div class="listen__controls">
     <button id="toggleBtn" class="btn btn--primary btn--lg">התחל האזנה</button>
-    <button id="pauseBtn" class="btn btn--ghost">השהה ל-30 דקות</button>
+    <button id="recordOnceBtn" class="btn btn--ghost">הקלט 10 שניות עכשיו</button>
   </div>
 
   <section class="listen__schedule">
-    <h3>חלון האזנה</h3>
-    <p>האפליקציה פעילה בין <strong>08:00</strong> ל-<strong>22:00</strong>. שינוי ב<a href="{{ url_for('dashboard.settings_page') }}">הגדרות</a>.</p>
+    <h3>סטטוס</h3>
+    <p id="statusText">המיקרופון לא הופעל עדיין. לחץ "התחל האזנה" לבקשת הרשאה.</p>
+    <div id="uploadLog" class="upload-log" aria-live="polite"></div>
+  </section>
+
+  <section class="listen__schedule">
+    <h3>הקלטות שנותחו היום</h3>
+    <div id="recentList">טוען...</div>
   </section>
 </section>
 
+<style>
+  .upload-log { margin-top: var(--space-3); font-family: var(--font-label); font-size: var(--label-md); color: var(--text-muted); max-height: 200px; overflow-y: auto; }
+  .upload-log .log-line { padding: var(--space-2) 0; border-bottom: 1px solid var(--glass-border); }
+  .upload-log .log-line.ok { color: var(--color-success); }
+  .upload-log .log-line.skip { color: var(--text-muted); }
+  .upload-log .log-line.err { color: var(--error); }
+</style>
+
 <script>
+let mediaRecorder = null;
+let mediaStream = null;
 let isListening = false;
+let intervalId = null;
+const CHUNK_SECONDS = 10;
+const INTERVAL_SECONDS = 15;
+
 const btn = document.getElementById('toggleBtn');
+const recOnce = document.getElementById('recordOnceBtn');
 const indicator = document.getElementById('statusIndicator');
 const label = document.getElementById('statusLabel');
+const statusText = document.getElementById('statusText');
+const uploadLog = document.getElementById('uploadLog');
 
-btn.addEventListener('click', () => {
-  isListening = !isListening;
-  if (isListening) {
+function log(text, kind = '') {
+  const row = document.createElement('div');
+  row.className = `log-line ${kind}`;
+  row.textContent = `${new Date().toLocaleTimeString('he-IL')} — ${text}`;
+  uploadLog.insertBefore(row, uploadLog.firstChild);
+  // Keep only last 20 lines
+  while (uploadLog.children.length > 20) uploadLog.removeChild(uploadLog.lastChild);
+}
+
+async function ensureMic() {
+  if (mediaStream) return mediaStream;
+  try {
+    mediaStream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        channelCount: 1,
+        sampleRate: 16000,
+        echoCancellation: true,
+        noiseSuppression: true,
+      },
+    });
+    statusText.textContent = 'הרשאת מיקרופון אושרה';
+    return mediaStream;
+  } catch (e) {
+    statusText.textContent = 'גישה למיקרופון נדחתה: ' + e.message;
+    throw e;
+  }
+}
+
+function pickMimeType() {
+  const types = [
+    'audio/webm;codecs=opus',
+    'audio/webm',
+    'audio/ogg;codecs=opus',
+    'audio/mp4',
+  ];
+  return types.find(t => MediaRecorder.isTypeSupported(t)) || '';
+}
+
+async function recordChunk() {
+  const stream = await ensureMic();
+  return new Promise((resolve, reject) => {
+    const mimeType = pickMimeType();
+    const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : {});
+    const chunks = [];
+    recorder.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
+    recorder.onerror = reject;
+    recorder.onstop = () => {
+      const blob = new Blob(chunks, { type: mimeType || 'audio/webm' });
+      resolve(blob);
+    };
+    recorder.start();
+    setTimeout(() => recorder.state !== 'inactive' && recorder.stop(), CHUNK_SECONDS * 1000);
+  });
+}
+
+async function uploadChunk(blob) {
+  const startedAt = new Date(Date.now() - CHUNK_SECONDS * 1000).toISOString();
+  const endedAt = new Date().toISOString();
+  const fd = new FormData();
+  fd.append('audio', blob, 'chunk.webm');
+  fd.append('duration_sec', String(CHUNK_SECONDS));
+  fd.append('started_at', startedAt);
+  fd.append('ended_at', endedAt);
+  const res = await fetch('/api/audio/chunk', { method: 'POST', body: fd, credentials: 'include' });
+  const text = await res.text();
+  let data; try { data = JSON.parse(text); } catch { data = { raw: text }; }
+  return { status: res.status, data };
+}
+
+async function recordAndUpload() {
+  try {
+    log('מתחיל קטע של 10 שניות...', '');
+    const blob = await recordChunk();
+    log(`קטע נקלט (${Math.round(blob.size / 1024)} KB) — מעלה...`, '');
+    const { status, data } = await uploadChunk(blob);
+    if (data?.success === false) {
+      log(`שגיאה: ${data.error?.message || status}`, 'err');
+    } else if (data?.data?.skipped === 'no_speech') {
+      log('דולג — לא זוהה דיבור', 'skip');
+    } else if (data?.data?.skipped === 'speaker_mismatch') {
+      log(`דולג — דובר לא מזוהה (דמיון: ${(data.data.similarity || 0).toFixed(2)})`, 'skip');
+    } else if (data?.data?.segment_id) {
+      log(`הועלה ונשלח לניתוח (similarity: ${(data.data.similarity || 0).toFixed(2)})`, 'ok');
+      setTimeout(refreshRecent, 8000);
+    } else {
+      log('הועלה', 'ok');
+    }
+  } catch (e) {
+    log(`שגיאה: ${e.message}`, 'err');
+  }
+}
+
+btn.addEventListener('click', async () => {
+  if (!isListening) {
+    try {
+      await ensureMic();
+    } catch { return; }
+    isListening = true;
     btn.textContent = 'עצור האזנה';
     indicator.classList.add('status-ring--active');
     label.textContent = 'מקשיב...';
+    recordAndUpload();
+    intervalId = setInterval(recordAndUpload, INTERVAL_SECONDS * 1000);
   } else {
+    isListening = false;
+    if (intervalId) { clearInterval(intervalId); intervalId = null; }
     btn.textContent = 'התחל האזנה';
     indicator.classList.remove('status-ring--active');
     label.textContent = 'מוכן';
+    if (mediaStream) { mediaStream.getTracks().forEach(t => t.stop()); mediaStream = null; }
   }
 });
 
-// Poll status
-async function poll() {
+recOnce.addEventListener('click', () => recordAndUpload());
+
+// Poll today stats
+async function refreshRecent() {
   try {
     const res = await fetch('/api/audio/status', { credentials: 'include' });
-    const { data } = await res.json();
-    if (data?.today) {
+    const body = await res.json();
+    const d = body.data;
+    if (d?.today) {
       document.getElementById('lastProcessed').textContent =
-        `היום: ${data.today.total_segments || 0} קטעים נותחו`;
+        `היום: ${d.today.total_segments || 0} קטעים נותחו`;
+    }
+    // Fetch recent segments with transcripts
+    const insRes = await fetch('/api/insights/triggers', { credentials: 'include' });
+    const ins = await insRes.json();
+    const list = document.getElementById('recentList');
+    const items = (ins.data || []).slice(0, 5);
+    if (!items.length) {
+      list.textContent = 'עדיין אין ניתוחים. הקלט קטע שיציג כאן את התוצאות.';
+    } else {
+      list.innerHTML = items.map(x =>
+        `<div class="log-line">${x.created_at?.slice(0,16) || ''} — ${x.trigger_description || x.primary_topic || '—'}</div>`
+      ).join('');
     }
   } catch (e) {}
 }
-setInterval(poll, 15000);
-poll();
+setInterval(refreshRecent, 15000);
+refreshRecent();
 </script>
 {% endblock %}

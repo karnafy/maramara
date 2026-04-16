@@ -1,0 +1,116 @@
+{% extends 'base.html' %}
+{% block title %}פרטי מטופל — MARAMARA{% endblock %}
+
+{% block content %}
+<section class="patient-detail" data-patient-id="{{ patient_id }}">
+  <header class="dashboard__header">
+    <h1 id="patientName">טוען...</h1>
+    <div class="btn-group">
+      <button class="btn btn--ghost" id="exportPdfBtn">ייצא PDF שבועי</button>
+      <button class="btn btn--primary" id="addNoteBtn">הוסף הערה</button>
+    </div>
+  </header>
+
+  <div class="grid grid--3 patient-kpis">
+    <div class="kpi"><span class="kpi__label">מגמת שליליות</span><span class="kpi__value" id="negTrend">—</span></div>
+    <div class="kpi"><span class="kpi__label">מגמת חיוביות</span><span class="kpi__value" id="posTrend">—</span></div>
+    <div class="kpi"><span class="kpi__label">ציון שיפור</span><span class="kpi__value" id="improvement">—</span></div>
+  </div>
+
+  <section class="panel">
+    <h3>7 ימים אחרונים</h3>
+    <canvas id="trendChart" width="800" height="280"></canvas>
+  </section>
+
+  <section class="panel">
+    <h3>סיכום שבועי (AI)</h3>
+    <p id="weeklySummary" class="summary-body">—</p>
+  </section>
+
+  <section class="panel">
+    <h3>הערות טיפוליות</h3>
+    <div id="notesList"></div>
+  </section>
+</section>
+
+<dialog id="noteDialog" class="dialog">
+  <form id="noteForm" class="form">
+    <h3>הערה חדשה</h3>
+    <label class="form__field">
+      <span class="form__label">כותרת</span>
+      <input type="text" name="title" class="form__input" />
+    </label>
+    <label class="form__field">
+      <span class="form__label">תוכן</span>
+      <textarea name="body" required rows="6" class="form__textarea"></textarea>
+    </label>
+    <label class="form__checkbox">
+      <input type="checkbox" name="is_intervention" />
+      <span>סמן כאירוע התערבות (מדד)</span>
+    </label>
+    <div class="form__actions">
+      <button type="button" class="btn btn--ghost" data-close>ביטול</button>
+      <button type="submit" class="btn btn--primary">שמור</button>
+    </div>
+  </form>
+</dialog>
+
+<script>
+const patientId = document.currentScript.closest('body').querySelector('.patient-detail').dataset.patientId;
+
+(async () => {
+  const res = await fetch(`/therapist/api/patients/${patientId}/overview`, { credentials: 'include' });
+  const { data } = await res.json();
+  if (!data) return;
+  const w = data.latest_weekly;
+  if (w) {
+    document.getElementById('negTrend').textContent = (w.negativity_avg || 0).toFixed(2);
+    document.getElementById('posTrend').textContent = (w.positivity_avg || 0).toFixed(2);
+    document.getElementById('improvement').textContent = (w.improvement_score || 0).toFixed(2);
+    document.getElementById('weeklySummary').textContent = w.therapist_summary || '—';
+  }
+  drawTrend(data.daily || []);
+})();
+
+function drawTrend(rows) {
+  const canvas = document.getElementById('trendChart');
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  if (!rows.length) return;
+  const pad = 40;
+  const w = canvas.width - pad * 2;
+  const h = canvas.height - pad * 2;
+  const maxVal = Math.max(...rows.map(r => r.negative_count || 0), 1);
+  rows.forEach((r, i) => {
+    const x = pad + (i / Math.max(rows.length - 1, 1)) * w;
+    const y = pad + h - ((r.negative_count || 0) / maxVal) * h;
+    if (i === 0) { ctx.beginPath(); ctx.moveTo(x, y); } else { ctx.lineTo(x, y); }
+  });
+  ctx.strokeStyle = '#ef4444';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+}
+
+const dlg = document.getElementById('noteDialog');
+document.getElementById('addNoteBtn').addEventListener('click', () => dlg.showModal());
+document.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', () => dlg.close()));
+
+document.getElementById('noteForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  await fetch('/therapist/api/notes', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      patient_id: patientId,
+      title: fd.get('title') || null,
+      body: fd.get('body'),
+      is_intervention: fd.get('is_intervention') === 'on',
+    }),
+    credentials: 'include',
+  });
+  dlg.close();
+  location.reload();
+});
+</script>
+{% endblock %}

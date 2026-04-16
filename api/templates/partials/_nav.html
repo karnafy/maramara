@@ -1,0 +1,41 @@
+<nav class="nav">
+  <div class="nav__container">
+    <a href="{{ url_for('index') }}" class="nav__brand">
+      <span class="nav__logo">🪞</span>
+      <span class="nav__name">MARAMARA</span>
+    </a>
+
+    {% if session.get('user') %}
+      {% set role = session.user.role %}
+      <ul class="nav__links">
+        {% if role == 'user' %}
+          <li><a href="{{ url_for('dashboard.home') }}">בית</a></li>
+          <li><a href="{{ url_for('dashboard.timeline') }}">ציר זמן</a></li>
+          <li><a href="{{ url_for('dashboard.insights_page') }}">תובנות</a></li>
+          <li><a href="{{ url_for('dashboard.listen_page') }}">האזנה</a></li>
+          <li><a href="{{ url_for('dashboard.settings_page') }}">הגדרות</a></li>
+        {% elif role == 'therapist' %}
+          <li><a href="{{ url_for('therapist.overview') }}">סקירה</a></li>
+          <li><a href="{{ url_for('therapist.patients_page') }}">מטופלים</a></li>
+          <li><a href="{{ url_for('therapist.reports_page') }}">דוחות</a></li>
+          <li><a href="{{ url_for('therapist.notes_page') }}">הערות</a></li>
+        {% elif role == 'admin' %}
+          <li><a href="{{ url_for('admin.dashboard') }}">לוח ניהול</a></li>
+          <li><a href="{{ url_for('admin.users_page') }}">משתמשים</a></li>
+        {% endif %}
+      </ul>
+
+      <div class="nav__user">
+        <span class="nav__email">{{ session.user.email }}</span>
+        <form method="post" action="{{ url_for('auth.logout') }}" class="nav__logout">
+          <button type="submit" class="btn btn--ghost btn--sm">התנתק</button>
+        </form>
+      </div>
+    {% else %}
+      <ul class="nav__links">
+        <li><a href="{{ url_for('auth.login_page') }}" class="btn btn--ghost">התחברות</a></li>
+        <li><a href="{{ url_for('auth.signup_page') }}" class="btn btn--primary">הרשמה</a></li>
+      </ul>
+    {% endif %}
+  </div>
+</nav>

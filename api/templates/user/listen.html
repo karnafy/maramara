@@ -1,0 +1,64 @@
+{% extends 'base.html' %}
+{% block title %}האזנה — MARAMARA{% endblock %}
+
+{% block content %}
+<section class="listen">
+  <h1>האזנה דיסקרטית</h1>
+  <p class="listen__subtitle">
+    האפליקציה מקליטה בקצרה, בודקת שזה הקול שלך, ומנתחת ברקע.
+    שום אודיו לא נשמר — רק תובנות.
+  </p>
+
+  <div class="listen__status">
+    <div id="statusIndicator" class="status-ring"></div>
+    <div>
+      <div id="statusLabel" class="status-label">מוכן</div>
+      <div id="lastProcessed" class="status-time">—</div>
+    </div>
+  </div>
+
+  <div class="listen__controls">
+    <button id="toggleBtn" class="btn btn--primary btn--lg">התחל האזנה</button>
+    <button id="pauseBtn" class="btn btn--ghost">השהה ל-30 דקות</button>
+  </div>
+
+  <section class="listen__schedule">
+    <h3>חלון האזנה</h3>
+    <p>האפליקציה פעילה בין <strong>08:00</strong> ל-<strong>22:00</strong>. שינוי ב<a href="{{ url_for('dashboard.settings_page') }}">הגדרות</a>.</p>
+  </section>
+</section>
+
+<script>
+let isListening = false;
+const btn = document.getElementById('toggleBtn');
+const indicator = document.getElementById('statusIndicator');
+const label = document.getElementById('statusLabel');
+
+btn.addEventListener('click', () => {
+  isListening = !isListening;
+  if (isListening) {
+    btn.textContent = 'עצור האזנה';
+    indicator.classList.add('status-ring--active');
+    label.textContent = 'מקשיב...';
+  } else {
+    btn.textContent = 'התחל האזנה';
+    indicator.classList.remove('status-ring--active');
+    label.textContent = 'מוכן';
+  }
+});
+
+// Poll status
+async function poll() {
+  try {
+    const res = await fetch('/api/audio/status', { credentials: 'include' });
+    const { data } = await res.json();
+    if (data?.today) {
+      document.getElementById('lastProcessed').textContent =
+        `היום: ${data.today.total_segments || 0} קטעים נותחו`;
+    }
+  } catch (e) {}
+}
+setInterval(poll, 15000);
+poll();
+</script>
+{% endblock %}

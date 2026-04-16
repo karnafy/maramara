@@ -1,0 +1,30 @@
+{% extends 'base.html' %}
+{% block title %}משתמשים — MARAMARA{% endblock %}
+
+{% block content %}
+<section>
+  <h1>ניהול משתמשים</h1>
+  <table class="data-table">
+    <thead>
+      <tr><th>אימייל</th><th>שם</th><th>תפקיד</th><th>שפה</th><th>Onboarding</th><th>פעולות</th></tr>
+    </thead>
+    <tbody id="usersBody"><tr><td colspan="6">טוען...</td></tr></tbody>
+  </table>
+</section>
+
+<script>
+(async () => {
+  const res = await fetch('/admin/api/users', { credentials: 'include' });
+  const { data } = await res.json();
+  const body = document.getElementById('usersBody');
+  body.innerHTML = data.map(u => `<tr>
+    <td>${u.email}</td>
+    <td>${u.full_name || '—'}</td>
+    <td>${u.role}</td>
+    <td>${u.language}</td>
+    <td>${u.onboarding_completed ? '✓' : '✗'}</td>
+    <td><button data-id="${u.id}" class="btn btn--ghost btn--sm">עדכן</button></td>
+  </tr>`).join('');
+})();
+</script>
+{% endblock %}

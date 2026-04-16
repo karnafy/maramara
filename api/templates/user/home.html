@@ -1,0 +1,63 @@
+{% extends 'base.html' %}
+{% block title %}בית — MARAMARA{% endblock %}
+
+{% block content %}
+<section class="dashboard">
+  <header class="dashboard__header">
+    <h1>שלום, {{ session.user.full_name or session.user.email }}</h1>
+    <p class="dashboard__subtitle">זה מה שלמדת על עצמך היום</p>
+  </header>
+
+  <div class="grid grid--4 dashboard__kpis">
+    <div class="kpi kpi--positive">
+      <span class="kpi__label">רגעי הקלה</span>
+      <span class="kpi__value" data-kpi="calming_count">—</span>
+    </div>
+    <div class="kpi kpi--negative">
+      <span class="kpi__label">טריגרים</span>
+      <span class="kpi__value" data-kpi="negative_count">—</span>
+    </div>
+    <div class="kpi">
+      <span class="kpi__label">עוצמה ממוצעת</span>
+      <span class="kpi__value" data-kpi="intensity_avg">—</span>
+    </div>
+    <div class="kpi">
+      <span class="kpi__label">שעת שיא</span>
+      <span class="kpi__value" data-kpi="peak_frustration_hour">—</span>
+    </div>
+  </div>
+
+  <section class="insight-block">
+    <h2>התובנה המרכזית שלך היום</h2>
+    <p class="insight-block__text" id="heroInsight">טוען...</p>
+  </section>
+
+  <section class="grid grid--2 dashboard__panels">
+    <article class="panel">
+      <h3>מה הפעיל אותך</h3>
+      <p data-field="top_trigger_topic">—</p>
+    </article>
+
+    <article class="panel">
+      <h3>מה הרגיע אותך</h3>
+      <p data-field="top_calming_topic">—</p>
+    </article>
+  </section>
+</section>
+
+<script>
+(async () => {
+  const res = await fetch('/dashboard/api/today', { credentials: 'include' });
+  const { data } = await res.json();
+  if (!data) return;
+  for (const [k, v] of Object.entries(data)) {
+    document.querySelectorAll(`[data-kpi="${k}"], [data-field="${k}"]`).forEach(el => {
+      el.textContent = v ?? '—';
+    });
+  }
+  document.getElementById('heroInsight').textContent =
+    data.summary_text ||
+    'נתוני היום עדיין מצטברים. דבר באופן טבעי והאפליקציה תנתח ברקע.';
+})();
+</script>
+{% endblock %}

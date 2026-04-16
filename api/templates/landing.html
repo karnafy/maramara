@@ -1,0 +1,63 @@
+{% extends 'base.html' %}
+{% block title %}MARAMARA — מראה טיפולית של הדיבור שלך{% endblock %}
+{% block body_class %}landing{% endblock %}
+
+{% block content %}
+<section class="hero">
+  <div class="hero__content">
+    <h1 class="hero__title">מה המראה אומרת?</h1>
+    <p class="hero__subtitle">
+      MARAMARA לא רק מקליט את מה שאמרת.
+      היא מראה לך <strong>איך</strong> אתה מדבר עם העולם,
+      מה מפעיל אותך, ומה באמת מרגיע אותך.
+    </p>
+
+    <div class="hero__actions">
+      <a href="{{ url_for('auth.signup_page') }}" class="btn btn--primary btn--lg">
+        התחל מסע של מודעות
+      </a>
+      <a href="#how" class="btn btn--ghost btn--lg">איך זה עובד?</a>
+    </div>
+  </div>
+
+  <div class="hero__visual" aria-hidden="true">
+    <div class="hero__pulse"></div>
+    <div class="hero__pulse hero__pulse--2"></div>
+    <div class="hero__pulse hero__pulse--3"></div>
+    <div class="hero__mirror">🪞</div>
+  </div>
+</section>
+
+<section id="how" class="section">
+  <h2 class="section__title">איך MARAMARA עובדת</h2>
+  <div class="grid grid--3">
+    <article class="card">
+      <div class="card__icon">🎙️</div>
+      <h3>האזנה דיסקרטית</h3>
+      <p>האפליקציה מקשיבה לדיבור שלך בלבד, בזמנים שאתה מגדיר. האודיו נמחק מיד אחרי ניתוח.</p>
+    </article>
+
+    <article class="card">
+      <div class="card__icon">🧠</div>
+      <h3>ניתוח ב-10 שכבות</h3>
+      <p>מילים, רגשות, טריגרים, דפוסים קוגניטיביים, מחזורי עצבנות, ומה שבאמת מרגיע אותך.</p>
+    </article>
+
+    <article class="card">
+      <div class="card__icon">📈</div>
+      <h3>שינוי מדיד</h3>
+      <p>לא עוד דיווח עצמי. נתונים אובייקטיבים להתקדמות שלך — ולמטפל שלך.</p>
+    </article>
+  </div>
+</section>
+
+<section class="section section--dark">
+  <h2 class="section__title">לא יומן. לא מד מצב רוח. מראה.</h2>
+  <div class="promise">
+    <blockquote>
+      אני מראה לך איך אתה מדבר עם העולם,
+      מה מפעיל אותך, ומה באמת מרגיע אותך.
+    </blockquote>
+  </div>
+</section>
+{% endblock %}

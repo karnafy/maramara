@@ -1,0 +1,54 @@
+{
+  "expo": {
+    "name": "MARAMARA",
+    "slug": "maramara",
+    "scheme": "maramara",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "icon": "./assets/icon.png",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#4F46E5"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "io.karnafai.maramara",
+      "infoPlist": {
+        "NSMicrophoneUsageDescription": "MARAMARA needs microphone access to analyse your speech patterns and build a behavioural mirror.",
+        "UIBackgroundModes": ["audio", "fetch", "processing"]
+      }
+    },
+    "android": {
+      "package": "io.karnafai.maramara",
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_MICROPHONE"
+      ],
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#4F46E5"
+      }
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static"
+    },
+    "plugins": [
+      "expo-router",
+      ["expo-audio", { "microphonePermission": "Allow MARAMARA to access your microphone." }],
+      "expo-secure-store"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "apiUrl": "http://localhost:5000",
+      "supabaseUrl": "https://tfygluotkrfjougyrvbw.supabase.co",
+      "supabaseAnonKey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRmeWdsdW90a3Jmam91Z3lydmJ3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYzMjM3NjMsImV4cCI6MjA5MTg5OTc2M30.fenBLQaumUGZeDoE0JdO5Cw7Qk-1VVjaOV_lp9xpPLI"
+    }
+  }
+}

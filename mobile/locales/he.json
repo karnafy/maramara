@@ -1,0 +1,66 @@
+{
+  "common": { "error": "שגיאה", "loading": "טוען...", "save": "שמור", "cancel": "ביטול", "done": "בוצע" },
+  "nav": {
+    "home": "בית",
+    "timeline": "ציר זמן",
+    "insights": "תובנות",
+    "listen": "האזנה",
+    "settings": "הגדרות"
+  },
+  "auth": {
+    "welcomeBack": "ברוך שובך",
+    "joinUs": "הצטרף אלינו",
+    "email": "אימייל",
+    "password": "סיסמה",
+    "fullName": "שם מלא",
+    "signIn": "התחברות",
+    "signUp": "הרשמה",
+    "needAccount": "אין לך חשבון? הירשם",
+    "haveAccount": "כבר רשום? התחבר",
+    "signupSuccess": "נרשמת בהצלחה",
+    "checkEmail": "בדוק את המייל לאימות"
+  },
+  "onboarding": {
+    "title": "בואו נכיר את הקול שלך",
+    "tapToRecord": "לחץ כדי להקליט",
+    "recording": "מקליט...",
+    "seconds": "שניות"
+  },
+  "home": {
+    "greeting": "שלום",
+    "todaySnapshot": "מה שלמדת על עצמך היום",
+    "kpi": {
+      "calming": "רגעי הקלה",
+      "triggers": "טריגרים",
+      "intensity": "עוצמה",
+      "peakHour": "שעת שיא"
+    },
+    "mainInsight": "התובנה המרכזית שלך היום",
+    "gatheringData": "עדיין אוסף נתונים. דבר באופן טבעי."
+  },
+  "timeline": {
+    "title": "ציר הזמן הרגשי",
+    "subtitle": "איך הרגשת במשך היום"
+  },
+  "insights": {
+    "title": "תובנות שבועיות",
+    "subtitle": "מבוסס על ניתוח CrewAI",
+    "reflection": "השתקפות",
+    "topTriggers": "טריגרים מובילים",
+    "topRegulation": "מקורות הרגעה",
+    "waiting": "התובנות השבועיות עדיין מחושבות"
+  },
+  "listen": {
+    "title": "האזנה",
+    "subtitle": "האפליקציה מנתחת ברקע ללא שמירת אודיו",
+    "ready": "מוכן",
+    "listening": "מקשיב...",
+    "start": "התחל האזנה",
+    "stop": "עצור"
+  },
+  "settings": {
+    "title": "הגדרות",
+    "language": "שפה",
+    "signOut": "התנתקות"
+  }
+}

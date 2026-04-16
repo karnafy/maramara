@@ -1,0 +1,79 @@
+{% extends 'base.html' %}
+{% block title %}מטופלים — MARAMARA{% endblock %}
+
+{% block content %}
+<section class="therapist-overview">
+  <header class="dashboard__header">
+    <h1>המטופלים שלך</h1>
+    <button class="btn btn--primary" id="inviteBtn">הזמן מטופל חדש</button>
+  </header>
+
+  <div class="grid grid--4">
+    <div class="kpi"><span class="kpi__label">מטופלים פעילים</span><span class="kpi__value">{{ links | length }}</span></div>
+    <div class="kpi"><span class="kpi__label">המתנה לאישור</span><span class="kpi__value">{{ links | selectattr('status', 'equalto', 'pending') | list | length }}</span></div>
+    <div class="kpi"><span class="kpi__label">דגלי סיכון</span><span class="kpi__value" id="riskCount">—</span></div>
+    <div class="kpi"><span class="kpi__label">דוחות שבועיים</span><span class="kpi__value" id="reportCount">—</span></div>
+  </div>
+
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>שם</th><th>סטטוס</th><th>מגמת שבוע</th><th>טריגר ראשי</th><th>דגל סיכון</th><th>פעיל לאחרונה</th><th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for link in links %}
+        <tr>
+          <td>{{ link.patient.full_name or link.patient.email }}</td>
+          <td><span class="badge badge--{{ link.status }}">{{ link.status }}</span></td>
+          <td>—</td>
+          <td>—</td>
+          <td>—</td>
+          <td>{{ link.accepted_at or '—' }}</td>
+          <td><a href="/therapist/patients/{{ link.patient.id }}" class="btn btn--ghost btn--sm">פתח</a></td>
+        </tr>
+      {% else %}
+        <tr><td colspan="7" class="empty">עדיין אין מטופלים. הזמן את הראשון.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+
+<dialog id="inviteDialog" class="dialog">
+  <form id="inviteForm" class="form">
+    <h3>הזמנת מטופל</h3>
+    <label class="form__field">
+      <span class="form__label">אימייל של המטופל</span>
+      <input type="email" name="email" required class="form__input" />
+    </label>
+    <div class="form__actions">
+      <button type="button" class="btn btn--ghost" data-close>ביטול</button>
+      <button type="submit" class="btn btn--primary">שלח הזמנה</button>
+    </div>
+  </form>
+</dialog>
+
+<script>
+const dialog = document.getElementById('inviteDialog');
+document.getElementById('inviteBtn').addEventListener('click', () => dialog.showModal());
+document.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', () => dialog.close()));
+
+document.getElementById('inviteForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  const res = await fetch('/therapist/api/invite', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ patient_email: fd.get('email') }),
+    credentials: 'include',
+  });
+  const data = await res.json();
+  if (data.success) {
+    alert('הזמנה נשלחה! הטוקן: ' + data.data.invite_token);
+    location.reload();
+  } else {
+    alert(data.error?.message || 'שגיאה');
+  }
+});
+</script>
+{% endblock %}

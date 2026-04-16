@@ -1,0 +1,77 @@
+{% extends 'base.html' %}
+{% block title %}תובנות — MARAMARA{% endblock %}
+
+{% block content %}
+<section class="insights-page">
+  <h1>התובנות השבועיות שלך</h1>
+  <p class="lead">מבוסס על ניתוח של 10 סוכני AI טיפוליים (CrewAI)</p>
+
+  <div class="grid grid--2 insights-grid">
+    <article class="insight-card insight-card--primary">
+      <h3>השתקפות</h3>
+      <p id="reflection">טוען...</p>
+    </article>
+
+    <article class="insight-card">
+      <h3>ציון התקדמות</h3>
+      <div class="progress-ring">
+        <span id="progressScore">—</span>
+      </div>
+      <p id="progressExplain" class="progress-explain">—</p>
+    </article>
+
+    <article class="insight-card">
+      <h3>מה הכי מפעיל אותך</h3>
+      <ul id="triggersList" class="list"></ul>
+    </article>
+
+    <article class="insight-card">
+      <h3>מה הכי מרגיע אותך</h3>
+      <ul id="regulationList" class="list"></ul>
+    </article>
+
+    <article class="insight-card insight-card--wide">
+      <h3>איך אתה מדבר עם עצמך</h3>
+      <div class="self-talk-bar">
+        <div class="self-talk-bar__segment supportive" style="width: 33%"><span>תומך</span></div>
+        <div class="self-talk-bar__segment neutral" style="width: 34%"><span>ניטרלי</span></div>
+        <div class="self-talk-bar__segment critical" style="width: 33%"><span>ביקורתי</span></div>
+      </div>
+    </article>
+  </div>
+</section>
+
+<script>
+(async () => {
+  const res = await fetch('/api/insights/weekly', { credentials: 'include' });
+  const { data } = await res.json();
+  if (!data) {
+    document.getElementById('reflection').textContent = 'התובנות השבועיות עדיין מחושבות. תקבל התראה כשהן מוכנות.';
+    return;
+  }
+  const ci = data.crewai_insights || {};
+  document.getElementById('reflection').textContent = ci.user_reflection || '—';
+  const prog = ci.progress || {};
+  document.getElementById('progressScore').textContent =
+    prog.verdict ? prog.verdict : '—';
+  document.getElementById('progressExplain').textContent = prog.explanation || '';
+
+  const triggers = (ci.triggers || []).slice(0, 5);
+  document.getElementById('triggersList').innerHTML = triggers.map(t =>
+    `<li><strong>${t.topic}</strong> — ${t.frequency}×, עוצמה ${Number(t.avg_intensity || 0).toFixed(1)}</li>`
+  ).join('') || '<li>אין נתונים</li>';
+
+  const regs = (ci.regulations || []).slice(0, 5);
+  document.getElementById('regulationList').innerHTML = regs.map(r =>
+    `<li><strong>${r.source}</strong> — ${r.frequency}×</li>`
+  ).join('') || '<li>אין נתונים</li>';
+
+  // Self-talk bar
+  const st = ci.self_talk || {};
+  const total = (st.supportive?.count || 0) + (st.neutral?.count || 0) + (st.critical?.count || 0) || 1;
+  document.querySelector('.self-talk-bar .supportive').style.width = `${(st.supportive?.count || 0) / total * 100}%`;
+  document.querySelector('.self-talk-bar .neutral').style.width = `${(st.neutral?.count || 0) / total * 100}%`;
+  document.querySelector('.self-talk-bar .critical').style.width = `${(st.critical?.count || 0) / total * 100}%`;
+})();
+</script>
+{% endblock %}

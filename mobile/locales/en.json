@@ -1,0 +1,66 @@
+{
+  "common": { "error": "Error", "loading": "Loading...", "save": "Save", "cancel": "Cancel", "done": "Done" },
+  "nav": {
+    "home": "Home",
+    "timeline": "Timeline",
+    "insights": "Insights",
+    "listen": "Listen",
+    "settings": "Settings"
+  },
+  "auth": {
+    "welcomeBack": "Welcome back",
+    "joinUs": "Join MARAMARA",
+    "email": "Email",
+    "password": "Password",
+    "fullName": "Full name",
+    "signIn": "Sign In",
+    "signUp": "Sign Up",
+    "needAccount": "No account? Sign up",
+    "haveAccount": "Have an account? Sign in",
+    "signupSuccess": "Registered successfully",
+    "checkEmail": "Check your email for verification"
+  },
+  "onboarding": {
+    "title": "Let's get to know your voice",
+    "tapToRecord": "Tap to record",
+    "recording": "Recording...",
+    "seconds": "seconds"
+  },
+  "home": {
+    "greeting": "Hello",
+    "todaySnapshot": "What you learned today",
+    "kpi": {
+      "calming": "Calm moments",
+      "triggers": "Triggers",
+      "intensity": "Avg intensity",
+      "peakHour": "Peak hour"
+    },
+    "mainInsight": "Today's main insight",
+    "gatheringData": "Still gathering data. Speak naturally."
+  },
+  "timeline": {
+    "title": "Emotional Timeline",
+    "subtitle": "How you felt through the day"
+  },
+  "insights": {
+    "title": "Weekly Insights",
+    "subtitle": "Powered by 10 CrewAI therapeutic agents",
+    "reflection": "Reflection",
+    "topTriggers": "Top Triggers",
+    "topRegulation": "Regulation sources",
+    "waiting": "Weekly insights are still being computed"
+  },
+  "listen": {
+    "title": "Listening",
+    "subtitle": "App analyses in background, no audio stored",
+    "ready": "Ready",
+    "listening": "Listening...",
+    "start": "Start listening",
+    "stop": "Stop"
+  },
+  "settings": {
+    "title": "Settings",
+    "language": "Language",
+    "signOut": "Sign Out"
+  }
+}

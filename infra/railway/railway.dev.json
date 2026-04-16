@@ -1,0 +1,24 @@
+{
+  "$schema": "https://railway.com/railway.schema.json",
+  "build": {
+    "builder": "DOCKERFILE",
+    "dockerfilePath": "api/Dockerfile"
+  },
+  "deploy": {
+    "numReplicas": 1,
+    "restartPolicyType": "ON_FAILURE",
+    "restartPolicyMaxRetries": 3,
+    "healthcheckPath": "/health",
+    "healthcheckTimeout": 60
+  },
+  "environments": {
+    "development": {
+      "variables": {
+        "APP_ENV": "development",
+        "FLASK_ENV": "development",
+        "DEBUG": "true",
+        "LOG_LEVEL": "DEBUG"
+      }
+    }
+  }
+}

@@ -1,0 +1,239 @@
+/* ============================================================
+   MARAMARA — Design Tokens
+   "Liquid Glass" + Stitch "The Empathetic Observer"
+   ============================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600&family=Rubik:wght@400;500;600;700;800&family=Heebo:wght@400;500;600;700;800&display=swap');
+
+:root {
+  /* ============================================================
+     LIQUID GLASS — Core colors (pastel gradient glows)
+     ============================================================ */
+
+  /* Ambient scene - soft cream → lavender background */
+  --scene-bg-1: #efe9f7;
+  --scene-bg-2: #e7dff5;
+  --scene-bg-3: #f3e6f0;
+
+  /* Glass surfaces (translucent) */
+  --glass-surface:         rgba(255, 255, 255, 0.42);
+  --glass-surface-high:    rgba(255, 255, 255, 0.62);
+  --glass-surface-low:     rgba(255, 255, 255, 0.28);
+  --glass-surface-solid:   rgba(255, 255, 255, 0.85);
+  --glass-border:          rgba(255, 255, 255, 0.45);
+  --glass-border-strong:   rgba(255, 255, 255, 0.7);
+  --glass-highlight:       rgba(255, 255, 255, 0.9);
+  --glass-inner-shadow:    rgba(255, 255, 255, 0.5);
+
+  /* Backdrop blur presets */
+  --blur-sm: 12px;
+  --blur-md: 20px;
+  --blur-lg: 32px;
+  --blur-xl: 48px;
+
+  /* Accent gradient glows */
+  --glow-purple:  radial-gradient(60% 60% at 30% 30%, rgba(168, 126, 255, 0.55), transparent 70%);
+  --glow-teal:    radial-gradient(60% 60% at 70% 60%, rgba(109, 213, 237, 0.55), transparent 70%);
+  --glow-pink:    radial-gradient(60% 60% at 80% 20%, rgba(255, 183, 213, 0.5), transparent 70%);
+  --glow-peach:   radial-gradient(60% 60% at 20% 80%, rgba(255, 194, 161, 0.5), transparent 70%);
+
+  /* ============================================================
+     BRAND — Stitch palette (Midnight Teal + Indigo)
+     ============================================================ */
+  --primary:                #104356;
+  --primary-container:      #2d5a6e;
+  --primary-fixed:          #bfe9ff;
+  --primary-fixed-dim:      #a0cde4;
+  --on-primary:             #ffffff;
+  --on-primary-container:   #a3d0e7;
+  --on-primary-fixed:       #001f2a;
+  --inverse-primary:        #a0cde4;
+
+  --secondary:              #6b5ce7;   /* liquid purple */
+  --secondary-container:    #9aacfe;
+  --secondary-fixed:        #dde1ff;
+  --secondary-fixed-dim:    #b7c4ff;
+  --on-secondary:           #ffffff;
+  --on-secondary-container: #2a3e88;
+
+  --tertiary:               #24424e;
+  --tertiary-container:     #3c5966;
+  --tertiary-fixed:         #c9e7f7;
+
+  --accent-purple:          #a87eff;
+  --accent-teal:            #6dd5ed;
+  --accent-pink:            #ffb7d5;
+  --accent-peach:           #ffc2a1;
+
+  --error:                  #ba1a1a;
+  --error-container:        #ffdad6;
+  --on-error:               #ffffff;
+  --on-error-container:     #93000a;
+
+  /* Text */
+  --text:                   #1a1826;
+  --text-muted:             #5a5670;
+  --text-inverse:           #ffffff;
+  --on-surface:             var(--text);
+  --on-surface-variant:     var(--text-muted);
+
+  /* Semantic */
+  --color-positive:         #3a9d78;
+  --color-negative:         var(--error);
+  --color-neutral:          #8b8799;
+  --color-mixed:            #c98d54;
+  --color-trigger:          #e05a76;
+  --color-calming:          var(--accent-teal);
+  --color-warning:          #d4a34e;
+  --color-danger:           var(--error);
+  --color-success:          #3a9d78;
+
+  /* Semantic aliases for legacy */
+  --color-primary-600: var(--primary);
+  --color-primary-700: #003544;
+  --color-primary-500: var(--primary-container);
+  --color-primary-400: var(--primary-fixed-dim);
+  --color-primary-100: var(--primary-fixed);
+  --color-primary-50:  #f3edff;
+  --color-primary-900: #00242f;
+  --color-bg:          transparent; /* scene background handles it */
+  --color-bg-elevated: var(--glass-surface-high);
+  --color-bg-muted:    var(--glass-surface-low);
+  --color-surface:     var(--glass-surface);
+  --color-border:      transparent;
+  --color-border-strong: var(--glass-border-strong);
+  --color-text:        var(--text);
+  --color-text-muted:  var(--text-muted);
+  --color-text-inverse:var(--text-inverse);
+
+  /* ============================================================
+     TYPOGRAPHY - Tri-font (Stitch)
+     ============================================================ */
+  --font-display:  'Plus Jakarta Sans', 'Manrope', 'Heebo', 'Rubik', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-body:     'Plus Jakarta Sans', 'Heebo', 'Rubik', -apple-system, sans-serif;
+  --font-label:    'Inter', 'Rubik', sans-serif;
+  --font-sans:     var(--font-body);
+  --font-mono:     ui-monospace, 'SF Mono', monospace;
+
+  --display-lg:    clamp(2.75rem, 5vw, 3.75rem);
+  --display-md:    clamp(2.25rem, 4vw, 3rem);
+  --display-sm:    clamp(1.875rem, 3vw, 2.25rem);
+  --headline-lg:   1.875rem;
+  --headline-md:   1.5rem;
+  --headline-sm:   1.25rem;
+  --title-lg:      1.25rem;
+  --title-md:      1.0625rem;
+  --title-sm:      0.9375rem;
+  --body-lg:       1.0625rem;
+  --body-md:       1rem;
+  --body-sm:       0.875rem;
+  --label-lg:      0.875rem;
+  --label-md:      0.75rem;
+  --label-sm:      0.6875rem;
+
+  --text-xs:  var(--label-md);
+  --text-sm:  var(--body-sm);
+  --text-md:  var(--body-md);
+  --text-lg:  var(--body-lg);
+  --text-xl:  var(--title-lg);
+  --text-2xl: var(--headline-md);
+  --text-3xl: var(--headline-lg);
+  --text-4xl: var(--display-sm);
+  --text-5xl: var(--display-lg);
+
+  --lh-tight: 1.15;
+  --lh-normal: 1.5;
+  --lh-relaxed: 1.7;
+  --letter-tight: -0.015em;
+  --letter-normal: 0;
+
+  /* ============================================================
+     SPACING
+     ============================================================ */
+  --space-1:  0.25rem;
+  --space-2:  0.5rem;
+  --space-3:  0.75rem;
+  --space-4:  1rem;
+  --space-5:  1.25rem;
+  --space-6:  1.5rem;
+  --space-8:  2rem;
+  --space-10: 2.5rem;
+  --space-12: 3rem;
+  --space-16: 4rem;
+  --space-20: 5rem;
+
+  /* ============================================================
+     RADII - Pill & large
+     ============================================================ */
+  --radius-xs:   6px;
+  --radius-sm:   10px;
+  --radius-md:   16px;
+  --radius-lg:   20px;
+  --radius-xl:   28px;
+  --radius-2xl:  36px;
+  --radius-3xl:  48px;
+  --radius-full: 9999px;
+
+  /* ============================================================
+     SHADOWS - Soft, colored, ambient
+     ============================================================ */
+  --shadow-xs:     0 1px 2px rgba(26, 24, 38, 0.04);
+  --shadow-sm:     0 4px 12px rgba(26, 24, 38, 0.06);
+  --shadow-md:     0 10px 30px rgba(26, 24, 38, 0.08);
+  --shadow-lg:     0 20px 60px rgba(26, 24, 38, 0.10);
+  --shadow-xl:     0 30px 80px rgba(26, 24, 38, 0.14);
+  --shadow-glow-purple: 0 20px 60px rgba(168, 126, 255, 0.35);
+  --shadow-glow-teal:   0 20px 60px rgba(109, 213, 237, 0.35);
+
+  /* Inner highlights for glass edges */
+  --inner-top:    inset 0 1px 0 var(--glass-highlight);
+  --inner-full:   inset 0 1px 0 var(--glass-highlight), inset 0 -1px 0 rgba(0,0,0,0.03);
+
+  /* ============================================================
+     MOTION
+     ============================================================ */
+  --ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-breathing: cubic-bezier(0.37, 0, 0.63, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --duration-fast: 150ms;
+  --duration-base: 260ms;
+  --duration-slow: 420ms;
+  --duration-breathing: 3.5s;
+
+  /* Layout */
+  --container-sm:  640px;
+  --container-md:  768px;
+  --container-lg: 1024px;
+  --container-xl: 1280px;
+
+  /* Z-index */
+  --z-bg-aura: 0;
+  --z-content: 10;
+  --z-nav: 50;
+  --z-modal: 100;
+  --z-toast: 200;
+}
+
+/* Dark mode — deep indigo scene */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --scene-bg-1: #1b1430;
+    --scene-bg-2: #120a26;
+    --scene-bg-3: #1f2040;
+
+    --glass-surface:       rgba(30, 26, 50, 0.5);
+    --glass-surface-high:  rgba(50, 46, 80, 0.7);
+    --glass-surface-low:   rgba(20, 18, 40, 0.3);
+    --glass-surface-solid: rgba(25, 22, 42, 0.88);
+    --glass-border:        rgba(255, 255, 255, 0.12);
+    --glass-border-strong: rgba(255, 255, 255, 0.22);
+    --glass-highlight:     rgba(255, 255, 255, 0.14);
+
+    --text:         #f1eef7;
+    --text-muted:   #b5b0c9;
+    --on-surface:   var(--text);
+    --on-surface-variant: var(--text-muted);
+
+    --color-bg-muted:   var(--glass-surface-low);
+  }
+}

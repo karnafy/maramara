@@ -1,0 +1,80 @@
+{% extends 'base.html' %}
+{% block title %}הרשמה — MARAMARA{% endblock %}
+
+{% block content %}
+<section class="auth-section">
+  <div class="auth-card">
+    <h1 class="auth-card__title">הצטרף ל-MARAMARA</h1>
+    <p class="auth-card__subtitle">צעד ראשון במסע של מודעות עצמית</p>
+
+    <form id="signupForm" class="form" novalidate>
+      <label class="form__field">
+        <span class="form__label">שם מלא</span>
+        <input type="text" name="full_name" required minlength="2" class="form__input" />
+      </label>
+
+      <label class="form__field">
+        <span class="form__label">אימייל</span>
+        <input type="email" name="email" required autocomplete="email" class="form__input" />
+      </label>
+
+      <label class="form__field">
+        <span class="form__label">סיסמה (לפחות 8 תווים)</span>
+        <input type="password" name="password" required minlength="8" autocomplete="new-password" class="form__input" />
+      </label>
+
+      <fieldset class="form__fieldset">
+        <legend class="form__label">אני מצטרף בתור</legend>
+        <label class="form__radio">
+          <input type="radio" name="role" value="user" checked />
+          <span>משתמש — מסע אישי</span>
+        </label>
+        <label class="form__radio">
+          <input type="radio" name="role" value="therapist" />
+          <span>מטפל / קואצ'ר</span>
+        </label>
+      </fieldset>
+
+      <label class="form__checkbox">
+        <input type="checkbox" name="agree" required />
+        <span>אני מסכים ל<a href="/terms">תנאי השימוש</a> ול<a href="/privacy">מדיניות הפרטיות</a></span>
+      </label>
+
+      <div id="signupError" class="form__error" hidden></div>
+      <button type="submit" class="btn btn--primary btn--block">צור חשבון</button>
+    </form>
+
+    <p class="auth-card__footer">
+      כבר יש לך חשבון? <a href="{{ url_for('auth.login_page') }}">התחבר</a>
+    </p>
+  </div>
+</section>
+
+<script>
+document.getElementById('signupForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const err = document.getElementById('signupError');
+  err.hidden = true;
+  const fd = new FormData(e.target);
+  const body = {
+    email: fd.get('email'),
+    password: fd.get('password'),
+    full_name: fd.get('full_name'),
+    role: fd.get('role'),
+  };
+  try {
+    const res = await fetch('/auth/api/signup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json();
+    if (!data.success) throw new Error(data.error?.message || 'שגיאה');
+    window.location = '/auth/login';
+  } catch (ex) {
+    err.textContent = ex.message;
+    err.hidden = false;
+  }
+});
+</script>
+{% endblock %}

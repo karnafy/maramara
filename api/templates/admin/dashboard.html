@@ -1,0 +1,32 @@
+{% extends 'base.html' %}
+{% block title %}לוח ניהול — MARAMARA{% endblock %}
+
+{% block content %}
+<section>
+  <h1>לוח ניהול מערכת</h1>
+
+  <div class="grid grid--4">
+    <div class="kpi"><span class="kpi__label">סה"כ משתמשים</span><span class="kpi__value">{{ stats.total_users }}</span></div>
+    <div class="kpi"><span class="kpi__label">משתמשי קצה</span><span class="kpi__value">{{ stats.users }}</span></div>
+    <div class="kpi"><span class="kpi__label">מטפלים</span><span class="kpi__value">{{ stats.therapists }}</span></div>
+    <div class="kpi"><span class="kpi__label">אדמינים</span><span class="kpi__value">{{ stats.admins }}</span></div>
+  </div>
+
+  <section class="panel">
+    <h3>דגלי סיכון פתוחים</h3>
+    <div id="risks">טוען...</div>
+  </section>
+</section>
+
+<script>
+(async () => {
+  const res = await fetch('/admin/api/risk-flags', { credentials: 'include' });
+  const { data } = await res.json();
+  const el = document.getElementById('risks');
+  if (!data?.length) { el.textContent = 'אין דגלים פתוחים'; return; }
+  el.innerHTML = data.map(r => `<div class="risk-row risk--${r.severity}">
+    <strong>${r.severity}</strong> — ${r.risk_type} — ${r.description || ''}
+  </div>`).join('');
+})();
+</script>
+{% endblock %}

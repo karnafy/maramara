@@ -1,0 +1,47 @@
+{% extends 'base.html' %}
+{% block title %}הגדרות — MARAMARA{% endblock %}
+
+{% block content %}
+<section class="settings">
+  <h1>הגדרות</h1>
+
+  <form class="panel" id="scheduleForm">
+    <h3>חלון האזנה</h3>
+    <div class="grid grid--2">
+      <label class="form__field">
+        <span class="form__label">שעת התחלה</span>
+        <input type="time" name="start_time" value="08:00" class="form__input" />
+      </label>
+      <label class="form__field">
+        <span class="form__label">שעת סיום</span>
+        <input type="time" name="end_time" value="22:00" class="form__input" />
+      </label>
+    </div>
+
+    <label class="form__checkbox">
+      <input type="checkbox" name="auto_off_night" checked />
+      <span>כיבוי אוטומטי בלילה</span>
+    </label>
+  </form>
+
+  <form class="panel" id="sensitivityForm">
+    <h3>רגישות זיהוי</h3>
+    <label class="form__field">
+      <input type="range" name="sensitivity" min="1" max="5" value="3" class="form__range" />
+      <span>רמה <output>3</output> מתוך 5</span>
+    </label>
+  </form>
+
+  <section class="panel">
+    <h3>פרופיל קול</h3>
+    <p>סטטוס: <strong>פעיל</strong></p>
+    <button class="btn btn--ghost">אמן מחדש</button>
+  </section>
+
+  <section class="panel panel--danger">
+    <h3>פעולות רגישות</h3>
+    <button class="btn btn--ghost">ייצוא כל הנתונים שלי</button>
+    <button class="btn btn--danger">מחיקת חשבון לצמיתות</button>
+  </section>
+</section>
+{% endblock %}

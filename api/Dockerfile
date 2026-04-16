@@ -31,5 +31,6 @@ EXPOSE 5000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s \
   CMD curl -f http://localhost:${PORT}/health || exit 1
 
-# Default command: web server (Railway sets PORT automatically)
-CMD exec gunicorn --bind 0.0.0.0:${PORT} --workers 2 --threads 4 --timeout 120 --access-logfile - app:app
+# Combined entrypoint: gunicorn (Flask) + RQ worker in same container
+RUN chmod +x /app/entrypoint.sh
+CMD ["/app/entrypoint.sh"]

@@ -1,0 +1,14 @@
+* text=auto eol=lf
+
+# Shell scripts must be LF or they break on Linux
+*.sh text eol=lf
+api/entrypoint.sh text eol=lf
+
+# Dockerfiles — keep LF
+Dockerfile text eol=lf
+Dockerfile.* text eol=lf
+
+# Binary
+*.png binary
+*.jpg binary
+*.woff2 binary

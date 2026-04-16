@@ -1,0 +1,151 @@
+{# Floating persistent recorder pod - keeps recording across page navigation via sessionStorage flag #}
+<div id="maramara-recorder" class="rec-pod" hidden aria-live="polite">
+  <div class="rec-pod__ring"></div>
+  <div class="rec-pod__label">
+    <div class="rec-pod__title">מקשיב...</div>
+    <div class="rec-pod__counter">0 קטעים הועלו</div>
+  </div>
+  <button id="recPodStop" class="btn btn--sm btn--ghost">עצור</button>
+</div>
+
+<style>
+  .rec-pod {
+    position: fixed;
+    bottom: var(--space-6);
+    inset-inline-start: var(--space-6);
+    z-index: var(--z-toast);
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-3) var(--space-5);
+    background: var(--glass-surface-high);
+    backdrop-filter: blur(var(--blur-md)) saturate(180%);
+    -webkit-backdrop-filter: blur(var(--blur-md)) saturate(180%);
+    border-radius: var(--radius-full);
+    box-shadow: var(--inner-top), var(--shadow-lg);
+  }
+  .rec-pod__ring {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--accent-purple);
+    box-shadow: 0 0 0 4px rgba(168, 126, 255, 0.3);
+    animation: breathing-ring var(--duration-breathing) var(--ease-breathing) infinite;
+  }
+  .rec-pod__title { font-weight: 700; font-size: var(--body-sm); }
+  .rec-pod__counter { font-family: var(--font-label); font-size: var(--label-md); color: var(--text-muted); }
+</style>
+
+<script>
+(function() {
+  // Restore recording state from sessionStorage (survives page navigation in same tab)
+  const STATE_KEY = 'maramara.recordingActive';
+  const COUNTER_KEY = 'maramara.recordedChunks';
+  const CHUNK_SECONDS = 10;
+  const INTERVAL_SECONDS = 15;
+
+  let mediaStream = null;
+  let intervalId = null;
+  let isActive = false;
+
+  const pod = document.getElementById('maramara-recorder');
+  const counterEl = pod?.querySelector('.rec-pod__counter');
+  const stopBtn = document.getElementById('recPodStop');
+
+  function getCount() { return parseInt(sessionStorage.getItem(COUNTER_KEY) || '0', 10); }
+  function setCount(n) { sessionStorage.setItem(COUNTER_KEY, String(n)); updateCounter(); }
+  function updateCounter() { if (counterEl) counterEl.textContent = `${getCount()} קטעים הועלו`; }
+
+  function showPod() { if (pod) pod.hidden = false; }
+  function hidePod() { if (pod) pod.hidden = true; }
+
+  async function ensureMic() {
+    if (mediaStream) return mediaStream;
+    mediaStream = await navigator.mediaDevices.getUserMedia({
+      audio: { channelCount: 1, sampleRate: 16000, echoCancellation: true, noiseSuppression: true },
+    });
+    return mediaStream;
+  }
+
+  function pickMimeType() {
+    const types = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus', 'audio/mp4'];
+    return types.find(t => MediaRecorder.isTypeSupported(t)) || '';
+  }
+
+  async function recordChunk() {
+    const stream = await ensureMic();
+    return new Promise((resolve, reject) => {
+      const mt = pickMimeType();
+      const rec = new MediaRecorder(stream, mt ? { mimeType: mt } : {});
+      const chunks = [];
+      rec.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
+      rec.onerror = reject;
+      rec.onstop = () => resolve(new Blob(chunks, { type: mt || 'audio/webm' }));
+      rec.start();
+      setTimeout(() => rec.state !== 'inactive' && rec.stop(), CHUNK_SECONDS * 1000);
+    });
+  }
+
+  async function uploadChunk(blob) {
+    const startedAt = new Date(Date.now() - CHUNK_SECONDS * 1000).toISOString();
+    const endedAt = new Date().toISOString();
+    const fd = new FormData();
+    fd.append('audio', blob, 'chunk.webm');
+    fd.append('duration_sec', String(CHUNK_SECONDS));
+    fd.append('started_at', startedAt);
+    fd.append('ended_at', endedAt);
+    const res = await fetch('/api/audio/chunk', { method: 'POST', body: fd, credentials: 'include' });
+    return res.json().catch(() => null);
+  }
+
+  async function loop() {
+    try {
+      const blob = await recordChunk();
+      await uploadChunk(blob);
+      setCount(getCount() + 1);
+    } catch (e) { /* swallow */ }
+  }
+
+  async function start() {
+    try {
+      await ensureMic();
+    } catch (e) {
+      alert('לא ניתן לגשת למיקרופון: ' + e.message);
+      sessionStorage.removeItem(STATE_KEY);
+      return false;
+    }
+    isActive = true;
+    sessionStorage.setItem(STATE_KEY, '1');
+    showPod();
+    updateCounter();
+    loop();
+    intervalId = setInterval(loop, INTERVAL_SECONDS * 1000);
+    return true;
+  }
+
+  function stop() {
+    isActive = false;
+    sessionStorage.removeItem(STATE_KEY);
+    if (intervalId) clearInterval(intervalId);
+    intervalId = null;
+    if (mediaStream) { mediaStream.getTracks().forEach(t => t.stop()); mediaStream = null; }
+    hidePod();
+    window.dispatchEvent(new Event('maramara:stopped'));
+  }
+
+  // Public API
+  window.MARAMARA_RECORDER = {
+    start, stop,
+    isActive: () => isActive,
+    getCount, setCount, updateCounter,
+  };
+
+  // Auto-resume if previous page left the flag set
+  if (sessionStorage.getItem(STATE_KEY) === '1') {
+    // Delay slightly so the page finishes loading
+    setTimeout(() => start(), 500);
+  }
+
+  stopBtn?.addEventListener('click', stop);
+})();
+</script>

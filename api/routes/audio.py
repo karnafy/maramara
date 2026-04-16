@@ -51,13 +51,16 @@ def upload_chunk():
 
     # Step 2: Speaker verify (requires prior enrollment)
     admin = get_admin_client()
-    voice = admin.table("voice_profiles").select("embedding_vector").eq("user_id", g.user_id).single().execute()
-    if not voice.data:
-        raise AppError("Voice profile not found - complete enrollment first", status_code=409)
-
-    enrolled_emb = voice.data["embedding_vector"]
-    chunk_emb = _speaker.extract_embedding(audio_bytes)
-    similarity = _speaker.cosine_similarity(enrolled_emb, chunk_emb)
+    voice = admin.table("voice_profiles").select("embedding_vector").eq("user_id", g.user_id).execute()
+    if voice.data:
+        enrolled_emb = voice.data[0]["embedding_vector"]
+        chunk_emb = _speaker.extract_embedding(audio_bytes)
+        similarity = _speaker.cosine_similarity(enrolled_emb, chunk_emb)
+    else:
+        # MVP mode: no enrollment yet → auto-accept (trust the JWT).
+        # Full ML speaker verification re-enabled after onboarding.
+        log.info("no_voice_profile_auto_accept", user_id=g.user_id)
+        similarity = 1.0
 
     segment_id = str(uuid.uuid4())
     matched = similarity >= _speaker.threshold

@@ -32,12 +32,8 @@ class VADService:
     def detect(self, audio_bytes: bytes) -> tuple[bool, float]:
         try:
             import numpy as np
-            import soundfile as sf
-            buf = io.BytesIO(audio_bytes)
-            data, sr = sf.read(buf, dtype="float32")
-            if data.ndim > 1:
-                data = data.mean(axis=1)
-            if len(data) == 0:
+            data = self._decode(audio_bytes)
+            if data is None or len(data) == 0:
                 return False, 0.0
 
             rms = float(np.sqrt(np.mean(data.astype("float64") ** 2)))
@@ -50,3 +46,30 @@ class VADService:
             log.warning("vad_failed", error=str(e))
             # Fail open - assume speech, let downstream (Whisper) decide
             return True, 0.5
+
+    @staticmethod
+    def _decode(audio_bytes: bytes):
+        """Decode WAV/PCM via soundfile, or WEBM/OGG/MP4 via pydub+ffmpeg."""
+        import numpy as np
+        # Try soundfile first (WAV/FLAC/OGG)
+        try:
+            import soundfile as sf
+            data, _sr = sf.read(io.BytesIO(audio_bytes), dtype="float32")
+            if data.ndim > 1:
+                data = data.mean(axis=1)
+            return data
+        except Exception:
+            pass
+        # Fallback: pydub (needs ffmpeg for webm/mp4)
+        try:
+            from pydub import AudioSegment
+            seg = AudioSegment.from_file(io.BytesIO(audio_bytes))
+            samples = np.array(seg.get_array_of_samples()).astype("float32")
+            if seg.channels > 1:
+                samples = samples.reshape(-1, seg.channels).mean(axis=1)
+            # Normalize to [-1, 1]
+            max_val = float(1 << (8 * seg.sample_width - 1))
+            return samples / max_val
+        except Exception as e:
+            log.debug("pydub_decode_failed", error=str(e))
+            return None

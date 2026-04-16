@@ -3,75 +3,242 @@
 
 {% block content %}
 <section class="insights-page">
-  <h1>התובנות השבועיות שלך</h1>
-  <p class="lead">מבוסס על ניתוח של 10 סוכני AI טיפוליים (CrewAI)</p>
+  <header class="dashboard__header">
+    <h1>התובנות שלך (7 ימים אחרונים)</h1>
+    <button class="btn btn--primary" id="genWeekly">צור תובנות AI מורחבות (CrewAI)</button>
+  </header>
+  <p class="lead" id="summaryLead">טוען...</p>
 
-  <div class="grid grid--2 insights-grid">
-    <article class="insight-card insight-card--primary">
-      <h3>השתקפות</h3>
-      <p id="reflection">טוען...</p>
-    </article>
+  <div id="emptyState" class="panel" hidden>
+    <h3>אין עדיין נתונים</h3>
+    <p>לך ל<a href="/dashboard/listen">מסך ההאזנה</a> והתחל להקליט. התובנות יופיעו מיד אחרי 1-2 קטעים.</p>
+  </div>
 
-    <article class="insight-card">
-      <h3>ציון התקדמות</h3>
-      <div class="progress-ring">
-        <span id="progressScore">—</span>
-      </div>
-      <p id="progressExplain" class="progress-explain">—</p>
-    </article>
+  <div id="content" hidden>
+    <div class="grid grid--4">
+      <div class="kpi"><span class="kpi__label">קטעים נותחו</span><span class="kpi__value" id="segCount">—</span></div>
+      <div class="kpi"><span class="kpi__label">מילים</span><span class="kpi__value" id="wordCount">—</span></div>
+      <div class="kpi"><span class="kpi__label">עוצמה ממוצעת</span><span class="kpi__value" id="intensityAvg">—</span></div>
+      <div class="kpi kpi--negative"><span class="kpi__label">ביקורת עצמית</span><span class="kpi__value" id="selfCritic">—</span></div>
+    </div>
 
-    <article class="insight-card">
-      <h3>מה הכי מפעיל אותך</h3>
-      <ul id="triggersList" class="list"></ul>
-    </article>
+    <div class="grid grid--2 insights-grid">
+      <article class="insight-card">
+        <h3>📊 התפלגות רגשית</h3>
+        <div id="polarityBar" class="self-talk-bar"></div>
+        <p id="polaritySummary" class="text-muted"></p>
+      </article>
 
-    <article class="insight-card">
-      <h3>מה הכי מרגיע אותך</h3>
-      <ul id="regulationList" class="list"></ul>
-    </article>
+      <article class="insight-card">
+        <h3>🌐 שפות</h3>
+        <div id="langs"></div>
+      </article>
 
-    <article class="insight-card insight-card--wide">
-      <h3>איך אתה מדבר עם עצמך</h3>
-      <div class="self-talk-bar">
-        <div class="self-talk-bar__segment supportive" style="width: 33%"><span>תומך</span></div>
-        <div class="self-talk-bar__segment neutral" style="width: 34%"><span>ניטרלי</span></div>
-        <div class="self-talk-bar__segment critical" style="width: 33%"><span>ביקורתי</span></div>
-      </div>
+      <article class="insight-card">
+        <h3>⚡ טריגרים אחרונים</h3>
+        <ul id="triggers" class="list">—</ul>
+      </article>
+
+      <article class="insight-card">
+        <h3>🌿 רגעי הרגעה</h3>
+        <ul id="calming" class="list">—</ul>
+      </article>
+
+      <article class="insight-card">
+        <h3>🎯 נושאים עיקריים</h3>
+        <div id="topics"></div>
+      </article>
+
+      <article class="insight-card">
+        <h3>🧠 דפוסים קוגניטיביים</h3>
+        <div id="cogPatterns"></div>
+      </article>
+
+      <article class="insight-card">
+        <h3>🏷️ מילות מפתח חוזרות</h3>
+        <div id="tags" class="tag-cloud"></div>
+      </article>
+
+      <article class="insight-card">
+        <h3>⏰ עוצמה לפי שעה</h3>
+        <canvas id="hourlyChart" width="380" height="180"></canvas>
+      </article>
+    </div>
+
+    <article class="insight-card insight-card--wide insight-card--primary" id="crewBox" hidden>
+      <h3>✨ תובנות CrewAI (10 סוכנים טיפוליים)</h3>
+      <div id="crewContent"></div>
     </article>
   </div>
 </section>
 
+<style>
+  .tag-cloud { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+  .tag-cloud .chip { background: var(--glass-surface-high); padding: 4px 12px; border-radius: var(--radius-full); font-size: var(--label-lg); }
+  .bar-row { display: grid; grid-template-columns: 120px 1fr 50px; gap: var(--space-3); align-items: center; margin-bottom: var(--space-2); }
+  .bar-row .bar { height: 8px; background: var(--glass-surface-low); border-radius: var(--radius-full); overflow: hidden; }
+  .bar-row .bar span { display: block; height: 100%; background: linear-gradient(90deg, var(--accent-purple), var(--accent-teal)); }
+  .bar-row .name { font-family: var(--font-label); font-size: var(--label-lg); color: var(--text-muted); }
+  .bar-row .value { font-family: var(--font-label); font-size: var(--label-md); color: var(--text-muted); text-align: end; }
+  .text-muted { color: var(--text-muted); font-size: var(--body-sm); }
+</style>
+
 <script>
-(async () => {
-  const res = await fetch('/api/insights/weekly', { credentials: 'include' });
+function renderBarRow(label, val, max, container) {
+  const pct = max ? Math.round((val / max) * 100) : 0;
+  const row = document.createElement('div');
+  row.className = 'bar-row';
+  row.innerHTML = `<span class="name">${label}</span><div class="bar"><span style="width:${pct}%"></span></div><span class="value">${val}</span>`;
+  container.appendChild(row);
+}
+
+function drawHourly(hourly) {
+  const canvas = document.getElementById('hourlyChart');
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  const pad = 30;
+  const w = canvas.width - pad * 2;
+  const h = canvas.height - pad * 2;
+  ctx.strokeStyle = 'rgba(120,120,140,0.3)';
+  ctx.strokeRect(pad, pad, w, h);
+  ctx.fillStyle = '#6b5ce7';
+  ctx.font = '10px sans-serif';
+  for (let hr = 0; hr < 24; hr++) {
+    const v = hourly[hr] || 0;
+    if (!v) continue;
+    const x = pad + (hr / 24) * w;
+    const barHeight = (v / 10) * h;
+    const y = pad + h - barHeight;
+    ctx.fillRect(x, y, Math.max(w / 24 - 2, 4), barHeight);
+  }
+  // hour labels
+  ctx.fillStyle = 'rgba(100,100,120,0.7)';
+  ctx.font = '9px sans-serif';
+  for (let hr = 0; hr <= 24; hr += 6) {
+    const x = pad + (hr / 24) * w;
+    ctx.fillText(`${hr}`, x, canvas.height - 8);
+  }
+}
+
+async function loadLive() {
+  const res = await fetch('/api/insights/live', { credentials: 'include' });
   const { data } = await res.json();
-  if (!data) {
-    document.getElementById('reflection').textContent = 'התובנות השבועיות עדיין מחושבות. תקבל התראה כשהן מוכנות.';
+  const empty = document.getElementById('emptyState');
+  const content = document.getElementById('content');
+
+  if (!data || !data.segment_count) {
+    empty.hidden = false;
+    content.hidden = true;
+    document.getElementById('summaryLead').textContent = '';
     return;
   }
-  const ci = data.crewai_insights || {};
-  document.getElementById('reflection').textContent = ci.user_reflection || '—';
-  const prog = ci.progress || {};
-  document.getElementById('progressScore').textContent =
-    prog.verdict ? prog.verdict : '—';
-  document.getElementById('progressExplain').textContent = prog.explanation || '';
+  empty.hidden = true;
+  content.hidden = false;
 
-  const triggers = (ci.triggers || []).slice(0, 5);
-  document.getElementById('triggersList').innerHTML = triggers.map(t =>
-    `<li><strong>${t.topic}</strong> — ${t.frequency}×, עוצמה ${Number(t.avg_intensity || 0).toFixed(1)}</li>`
-  ).join('') || '<li>אין נתונים</li>';
+  document.getElementById('summaryLead').textContent =
+    `ניתחנו ${data.segment_count} קטעים וכ־${data.total_words} מילים בשבוע האחרון.`;
+  document.getElementById('segCount').textContent = data.segment_count;
+  document.getElementById('wordCount').textContent = data.total_words;
+  document.getElementById('intensityAvg').textContent = (data.intensity_avg || 0).toFixed(1);
+  document.getElementById('selfCritic').textContent = `${Math.round((data.self_criticism_avg || 0) * 100)}%`;
 
-  const regs = (ci.regulations || []).slice(0, 5);
-  document.getElementById('regulationList').innerHTML = regs.map(r =>
-    `<li><strong>${r.source}</strong> — ${r.frequency}×</li>`
-  ).join('') || '<li>אין נתונים</li>';
+  // Polarity bar
+  const pd = data.polarity_distribution || {};
+  const total = (pd.positive || 0) + (pd.neutral || 0) + (pd.negative || 0) + (pd.mixed || 0) || 1;
+  const bar = document.getElementById('polarityBar');
+  bar.innerHTML = `
+    <div class="self-talk-bar__segment supportive" style="width:${(pd.positive||0)/total*100}%">חיובי ${pd.positive||0}</div>
+    <div class="self-talk-bar__segment neutral" style="width:${(pd.neutral||0)/total*100}%">ניטרלי ${pd.neutral||0}</div>
+    <div class="self-talk-bar__segment critical" style="width:${((pd.negative||0)+(pd.mixed||0))/total*100}%">שלילי ${(pd.negative||0)+(pd.mixed||0)}</div>
+  `;
+  document.getElementById('polaritySummary').textContent =
+    `${pd.positive||0} חיובי · ${pd.neutral||0} ניטרלי · ${pd.negative||0} שלילי · ${pd.mixed||0} מעורב`;
 
-  // Self-talk bar
-  const st = ci.self_talk || {};
-  const total = (st.supportive?.count || 0) + (st.neutral?.count || 0) + (st.critical?.count || 0) || 1;
-  document.querySelector('.self-talk-bar .supportive').style.width = `${(st.supportive?.count || 0) / total * 100}%`;
-  document.querySelector('.self-talk-bar .neutral').style.width = `${(st.neutral?.count || 0) / total * 100}%`;
-  document.querySelector('.self-talk-bar .critical').style.width = `${(st.critical?.count || 0) / total * 100}%`;
-})();
+  // Languages
+  document.getElementById('langs').innerHTML = (data.languages || []).map(([l, n]) =>
+    `<div>${l === 'he' ? '🇮🇱 עברית' : l === 'en' ? '🇬🇧 English' : l}: <strong>${n}</strong></div>`
+  ).join('') || 'אין';
+
+  // Triggers
+  const tr = document.getElementById('triggers');
+  tr.innerHTML = (data.triggers || []).slice(0, 5).map(t =>
+    `<li><strong>${t.topic || '—'}</strong>: ${t.desc || ''} <small>(${new Date(t.when).toLocaleString('he-IL')})</small></li>`
+  ).join('') || '<li>אין טריגרים השבוע 🌱</li>';
+
+  // Calming
+  const cm = document.getElementById('calming');
+  cm.innerHTML = (data.calming || []).slice(0, 5).map(c =>
+    `<li><strong>${c.topic || '—'}</strong>: ${c.desc || ''}</li>`
+  ).join('') || '<li>טרם זוהו רגעי הרגעה</li>';
+
+  // Topics
+  const tc = document.getElementById('topics');
+  tc.innerHTML = '';
+  const topicMax = Math.max(1, ...(data.top_topics || []).map(([_, n]) => n));
+  (data.top_topics || []).forEach(([name, n]) => renderBarRow(name, n, topicMax, tc));
+
+  // Cognitive patterns
+  const cg = document.getElementById('cogPatterns');
+  cg.innerHTML = '';
+  const patMax = Math.max(1, ...(data.cognitive_patterns || []).map(([_, n]) => n));
+  if (!data.cognitive_patterns?.length) {
+    cg.innerHTML = '<p class="text-muted">לא זוהו דפוסים קוגניטיביים חוזרים 👏</p>';
+  } else {
+    const labelMap = {
+      catastrophizing: 'קטסטרופיזציה', all_or_nothing: 'הכל או כלום',
+      personalization: 'האשמה עצמית', should_statements: '"צריך"',
+      mind_reading: 'קריאת מחשבות', filtering: 'סינון שלילי'
+    };
+    data.cognitive_patterns.forEach(([name, n]) =>
+      renderBarRow(labelMap[name] || name, n, patMax, cg)
+    );
+  }
+
+  // Tags
+  document.getElementById('tags').innerHTML = (data.top_tags || []).map(([t, n]) =>
+    `<span class="chip">${t} · ${n}</span>`
+  ).join('') || '<span class="text-muted">אין</span>';
+
+  drawHourly(data.hourly_intensity || {});
+}
+
+async function loadCrew() {
+  const res = await fetch('/api/insights/weekly', { credentials: 'include' });
+  const { data } = await res.json();
+  if (!data || !data.crewai_insights) return;
+  const box = document.getElementById('crewBox');
+  const body = document.getElementById('crewContent');
+  box.hidden = false;
+  const ci = data.crewai_insights;
+  body.innerHTML = `
+    ${ci.user_reflection ? `<p><strong>השתקפות:</strong> ${ci.user_reflection}</p>` : ''}
+    ${ci.therapist_summary ? `<p><strong>סיכום למטפל:</strong> ${ci.therapist_summary}</p>` : ''}
+    ${ci.progress ? `<p><strong>התקדמות:</strong> ${ci.progress.verdict} — ${ci.progress.explanation || ''}</p>` : ''}
+  `;
+}
+
+document.getElementById('genWeekly').addEventListener('click', async (e) => {
+  const btn = e.target;
+  btn.disabled = true;
+  btn.textContent = 'מעבד... (30-90 שניות)';
+  try {
+    const res = await fetch('/api/insights/generate-weekly', { method: 'POST', credentials: 'include' });
+    const body = await res.json();
+    if (body.success) {
+      btn.textContent = 'התובנות מוכנות!';
+      setTimeout(() => { loadCrew(); btn.textContent = 'רענן תובנות AI'; btn.disabled = false; }, 3000);
+    } else {
+      btn.textContent = 'שגיאה - נסה שוב';
+      btn.disabled = false;
+    }
+  } catch (err) {
+    btn.textContent = 'שגיאה';
+    btn.disabled = false;
+  }
+});
+
+loadLive();
+loadCrew();
+setInterval(loadLive, 20000);
 </script>
 {% endblock %}

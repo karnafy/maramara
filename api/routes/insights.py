@@ -74,3 +74,104 @@ def weekly():
         "week_start", desc=True
     ).limit(1).execute()
     return jsonify({"success": True, "data": resp.data[0] if resp.data else None})
+
+
+@bp.get("/live")
+@require_auth
+def live():
+    """Live aggregations from segment_analysis (no CrewAI needed)."""
+    from collections import Counter
+    admin = get_admin_client()
+    from datetime import datetime, timedelta, timezone
+    since = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
+
+    analyses = admin.table("segment_analysis").select(
+        "polarity,intensity_score,complaint_score,curse_score,calming_score,"
+        "self_criticism_score,primary_topic,secondary_topic,trigger_detected,"
+        "trigger_description,calming_detected,calming_description,"
+        "cognitive_patterns,tags,created_at"
+    ).eq("user_id", g.user_id).gte("created_at", since).order(
+        "created_at", desc=True
+    ).execute()
+
+    transcripts = admin.table("transcripts").select(
+        "transcript_text,created_at,language,word_count"
+    ).eq("user_id", g.user_id).gte("created_at", since).execute()
+
+    rows = analyses.data or []
+    tlist = transcripts.data or []
+
+    if not rows:
+        return jsonify({"success": True, "data": {
+            "segment_count": 0,
+            "total_words": 0,
+        }})
+
+    polarity_counts = Counter(r["polarity"] for r in rows if r.get("polarity"))
+    topics = Counter(r["primary_topic"] for r in rows if r.get("primary_topic"))
+
+    triggers = [
+        {"topic": r.get("primary_topic"), "desc": r.get("trigger_description"), "when": r["created_at"], "intensity": r.get("intensity_score")}
+        for r in rows if r.get("trigger_detected")
+    ][:10]
+    calming = [
+        {"topic": r.get("primary_topic"), "desc": r.get("calming_description"), "when": r["created_at"]}
+        for r in rows if r.get("calming_detected")
+    ][:10]
+
+    # Cognitive patterns
+    cog = Counter()
+    for r in rows:
+        for p in (r.get("cognitive_patterns") or []):
+            cog[p] += 1
+
+    # Hourly intensity heatmap
+    hourly: dict[int, list[float]] = {}
+    for r in rows:
+        try:
+            h = datetime.fromisoformat(r["created_at"].replace("Z", "+00:00")).hour
+        except Exception:
+            continue
+        hourly.setdefault(h, []).append(r.get("intensity_score") or 0)
+    hourly_avg = {h: sum(v) / len(v) for h, v in hourly.items()}
+
+    # Top tags
+    tag_counts = Counter()
+    for r in rows:
+        for t in (r.get("tags") or []):
+            if t:
+                tag_counts[t] += 1
+
+    total_words = sum(t.get("word_count", 0) or 0 for t in tlist)
+    languages = Counter(t.get("language", "?") for t in tlist)
+
+    self_critic_avg = (
+        sum((r.get("self_criticism_score") or 0) for r in rows) / len(rows)
+    ) if rows else 0
+    intensity_avg = sum((r.get("intensity_score") or 0) for r in rows) / len(rows)
+
+    return jsonify({"success": True, "data": {
+        "segment_count": len(rows),
+        "total_words": total_words,
+        "languages": languages.most_common(),
+        "polarity_distribution": dict(polarity_counts),
+        "top_topics": topics.most_common(8),
+        "triggers": triggers,
+        "calming": calming,
+        "cognitive_patterns": cog.most_common(),
+        "hourly_intensity": hourly_avg,
+        "top_tags": tag_counts.most_common(12),
+        "self_criticism_avg": self_critic_avg,
+        "intensity_avg": intensity_avg,
+    }})
+
+
+@bp.post("/generate-weekly")
+@require_auth
+def generate_weekly():
+    """Manually trigger CrewAI weekly insights for the current user."""
+    from datetime import date, timedelta
+    from services.queue import enqueue_weekly_crewai
+    week_start = (date.today() - timedelta(days=date.today().weekday())).isoformat()
+    job_id = enqueue_weekly_crewai(g.user_id, week_start)
+    return jsonify({"success": True, "data": {"job_id": job_id, "week_start": week_start}})

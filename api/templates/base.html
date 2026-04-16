@@ -32,6 +32,10 @@
 
   {% include 'partials/_footer.html' %}
 
+  {% if session.get('user', {}).get('role') == 'user' %}
+    {% include 'partials/_recorder.html' %}
+  {% endif %}
+
   <script src="{{ url_for('static', filename='js/app.js') }}"></script>
   {% block extra_js %}{% endblock %}
 </body>

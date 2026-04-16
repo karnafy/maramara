@@ -1,0 +1,138 @@
+{% extends 'base.html' %}
+{% block title %}ההקלטות שלי — MARAMARA{% endblock %}
+
+{% block content %}
+<section class="recordings">
+  <header class="dashboard__header">
+    <h1>ההקלטות שלי</h1>
+    <p class="lead">
+      MARAMARA לא שומרת את האודיו שלך — היא שומרת רק את הטקסט והניתוח.
+      זו הבטחת הפרטיות שלנו.
+    </p>
+  </header>
+
+  <div class="panel">
+    <h3>סיכום</h3>
+    <div id="summary" class="kpi-row">טוען...</div>
+  </div>
+
+  <div class="panel">
+    <h3>הקלטות אחרונות (50 קטעים אחרונים)</h3>
+    <div id="recordingsList" class="recordings-list">טוען...</div>
+  </div>
+</section>
+
+<style>
+  .kpi-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: var(--space-4); }
+  .kpi-row .stat { background: var(--glass-surface-low); backdrop-filter: blur(var(--blur-sm)); padding: var(--space-4); border-radius: var(--radius-lg); text-align: center; }
+  .kpi-row .stat__value { font-family: var(--font-display); font-size: var(--headline-md); font-weight: 800; color: var(--text); }
+  .kpi-row .stat__label { font-family: var(--font-label); font-size: var(--label-md); color: var(--text-muted); }
+
+  .recordings-list { display: flex; flex-direction: column; gap: var(--space-4); }
+  .rec-item {
+    background: var(--glass-surface-low);
+    backdrop-filter: blur(var(--blur-sm));
+    border-radius: var(--radius-lg);
+    padding: var(--space-5);
+    border-inline-start: 4px solid var(--outline-variant);
+    transition: transform var(--duration-fast);
+  }
+  .rec-item:hover { transform: translateY(-2px); }
+  .rec-item--positive { border-color: var(--color-success); }
+  .rec-item--negative { border-color: var(--error); }
+  .rec-item--trigger { border-color: var(--color-trigger); }
+  .rec-item--calming { border-color: var(--accent-teal); }
+  .rec-item--skipped { opacity: 0.6; border-color: var(--outline); }
+
+  .rec-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: var(--space-3); flex-wrap: wrap; gap: var(--space-2); }
+  .rec-time { font-family: var(--font-label); font-size: var(--label-lg); color: var(--text-muted); }
+  .rec-badges { display: flex; gap: var(--space-2); flex-wrap: wrap; }
+
+  .rec-transcript { font-size: var(--body-md); line-height: var(--lh-relaxed); color: var(--text); margin: var(--space-3) 0; padding: var(--space-4); background: var(--surface-container-lowest); border-radius: var(--radius-md); }
+  .rec-meta { display: flex; gap: var(--space-4); font-family: var(--font-label); font-size: var(--label-md); color: var(--text-muted); flex-wrap: wrap; margin-top: var(--space-3); }
+  .rec-empty { text-align: center; color: var(--text-muted); padding: var(--space-10); }
+
+  .tag-chip { background: var(--primary-fixed); color: var(--on-primary-fixed); padding: 2px 10px; border-radius: var(--radius-full); font-size: var(--label-md); }
+</style>
+
+<script>
+function iso(d) { return d ? new Date(d).toLocaleString('he-IL', { hour12: false }) : '—'; }
+
+function renderBadge(item) {
+  const a = item.analysis;
+  const badges = [];
+  if (!item.matched_to_user && item.speech_detected) {
+    badges.push('<span class="badge badge--revoked">דובר לא זוהה</span>');
+  } else if (!item.speech_detected) {
+    badges.push('<span class="badge">ללא דיבור</span>');
+  }
+  if (a?.polarity === 'positive') badges.push('<span class="badge badge--active">חיובי</span>');
+  if (a?.polarity === 'negative') badges.push('<span class="badge badge--revoked">שלילי</span>');
+  if (a?.polarity === 'mixed') badges.push('<span class="badge">מעורב</span>');
+  if (a?.trigger_detected) badges.push('<span class="badge badge--revoked">טריגר</span>');
+  if (a?.calming_detected) badges.push('<span class="badge badge--active">הרגעה</span>');
+  if (a?.primary_topic) badges.push(`<span class="tag-chip">${a.primary_topic}</span>`);
+  return badges.join(' ');
+}
+
+function itemClass(item) {
+  if (!item.matched_to_user || !item.speech_detected) return 'rec-item--skipped';
+  const a = item.analysis;
+  if (!a) return '';
+  if (a.trigger_detected) return 'rec-item--trigger';
+  if (a.calming_detected) return 'rec-item--calming';
+  if (a.polarity === 'positive') return 'rec-item--positive';
+  if (a.polarity === 'negative') return 'rec-item--negative';
+  return '';
+}
+
+(async function load() {
+  const res = await fetch('/dashboard/api/segments?limit=50', { credentials: 'include' });
+  const { data } = await res.json();
+  if (!data || !data.length) {
+    document.getElementById('recordingsList').innerHTML = '<div class="rec-empty">אין עדיין הקלטות. לך ל<a href="/dashboard/listen">מסך ההאזנה</a> כדי להתחיל.</div>';
+    document.getElementById('summary').innerHTML = '';
+    return;
+  }
+
+  // Summary stats
+  const total = data.length;
+  const analyzed = data.filter(x => x.analysis).length;
+  const triggers = data.filter(x => x.analysis?.trigger_detected).length;
+  const calming = data.filter(x => x.analysis?.calming_detected).length;
+  const totalSec = Math.round(data.reduce((s, x) => s + (x.duration_sec || 0), 0));
+  document.getElementById('summary').innerHTML = `
+    <div class="stat"><div class="stat__value">${total}</div><div class="stat__label">סה"כ הקלטות</div></div>
+    <div class="stat"><div class="stat__value">${analyzed}</div><div class="stat__label">נותחו</div></div>
+    <div class="stat"><div class="stat__value">${triggers}</div><div class="stat__label">טריגרים</div></div>
+    <div class="stat"><div class="stat__value">${calming}</div><div class="stat__label">רגעי הרגעה</div></div>
+    <div class="stat"><div class="stat__value">${totalSec}s</div><div class="stat__label">זמן כולל</div></div>
+  `;
+
+  // Render list
+  const list = document.getElementById('recordingsList');
+  list.innerHTML = data.map(item => {
+    const t = item.transcript;
+    const a = item.analysis;
+    return `
+      <article class="rec-item ${itemClass(item)}">
+        <div class="rec-head">
+          <span class="rec-time">${iso(item.started_at)} · ${Math.round(item.duration_sec || 0)} שניות</span>
+          <div class="rec-badges">${renderBadge(item)}</div>
+        </div>
+        ${t ? `<div class="rec-transcript">${t.transcript_text || '(ריק)'}</div>` : '<div class="rec-empty">אין תמלול</div>'}
+        ${a ? `
+          <div class="rec-meta">
+            <span>📊 עוצמה: ${(a.intensity_score ?? 0).toFixed(1)}/10</span>
+            ${a.trigger_description ? `<span>⚡ ${a.trigger_description}</span>` : ''}
+            ${a.calming_description ? `<span>🌿 ${a.calming_description}</span>` : ''}
+            ${t?.confidence !== undefined ? `<span>🎯 ${Math.round((t.confidence || 0) * 100)}% confidence</span>` : ''}
+            ${t?.language ? `<span>🌐 ${t.language}</span>` : ''}
+          </div>
+        ` : ''}
+      </article>
+    `;
+  }).join('');
+})();
+</script>
+{% endblock %}

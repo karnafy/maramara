@@ -43,6 +43,12 @@ def settings_page():
     return render_template("user/settings.html")
 
 
+@bp.get("/recordings")
+@require_role("user")
+def recordings_page():
+    return render_template("user/recordings.html")
+
+
 # -------- JSON API --------
 
 @bp.get("/api/today")
@@ -63,6 +69,45 @@ def api_week():
         "date", week_ago
     ).order("date", desc=False).execute()
     return jsonify({"success": True, "data": metrics.data})
+
+
+@bp.get("/api/segments")
+@require_auth
+def api_segments():
+    """List user's recent audio segments with transcript + analysis."""
+    limit = min(int(request.args.get("limit", 50)), 200)
+    admin = get_admin_client()
+
+    segments = admin.table("audio_segments").select(
+        "id,started_at,ended_at,duration_sec,speech_detected,"
+        "speaker_match_score,matched_to_user,transcript_status,analysis_status"
+    ).eq("user_id", g.user_id).order("started_at", desc=True).limit(limit).execute()
+
+    if not segments.data:
+        return jsonify({"success": True, "data": []})
+
+    seg_ids = [s["id"] for s in segments.data]
+
+    transcripts = admin.table("transcripts").select(
+        "audio_segment_id,transcript_text,language,word_count,confidence"
+    ).in_("audio_segment_id", seg_ids).execute()
+    tmap = {t["audio_segment_id"]: t for t in (transcripts.data or [])}
+
+    analyses = admin.table("segment_analysis").select(
+        "audio_segment_id,polarity,intensity_score,primary_topic,"
+        "trigger_detected,trigger_description,calming_detected,"
+        "calming_description,tags"
+    ).in_("audio_segment_id", seg_ids).execute()
+    amap = {a["audio_segment_id"]: a for a in (analyses.data or [])}
+
+    merged = []
+    for s in segments.data:
+        merged.append({
+            **s,
+            "transcript": tmap.get(s["id"]),
+            "analysis": amap.get(s["id"]),
+        })
+    return jsonify({"success": True, "data": merged})
 
 
 @bp.get("/api/timeline")

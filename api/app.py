@@ -37,11 +37,20 @@ def create_app() -> Flask:
         supports_credentials=True,
     )
 
+    # Rate limiter storage: try Redis, fall back to in-memory for local dev
+    storage_uri = settings.redis_url
+    try:
+        import redis as _redis
+        _redis.from_url(settings.redis_url, socket_connect_timeout=1).ping()
+    except Exception:
+        storage_uri = "memory://"
+        logging.getLogger(__name__).info("Limiter falling back to memory:// (Redis unreachable)")
+
     Limiter(
         get_remote_address,
         app=app,
         default_limits=["200 per minute", "50 per second"],
-        storage_uri=settings.redis_url,
+        storage_uri=storage_uri,
     )
 
     init_supabase_client(settings)

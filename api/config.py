@@ -1,13 +1,23 @@
 """MARAMARA - Application configuration via pydantic-settings."""
 from functools import lru_cache
+from pathlib import Path
 from typing import Literal
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+# Look for .env in project root (one level up from api/)
+_API_DIR = Path(__file__).resolve().parent
+_PROJECT_ROOT = _API_DIR.parent
+_ENV_CANDIDATES = [
+    _PROJECT_ROOT / ".env",  # V2/maramara/.env
+    _API_DIR / ".env",       # V2/maramara/api/.env
+]
+_ENV_FILES = tuple(str(p) for p in _ENV_CANDIDATES if p.exists())
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=_ENV_FILES or ".env",
         env_file_encoding="utf-8",
         case_sensitive=False,
         extra="ignore",

@@ -1,6 +1,7 @@
-#!/bin/sh
+#!/bin/bash
 # Combined entrypoint: run gunicorn + RQ worker in one container.
 # If either process dies, exit so Railway restarts the container.
+# Uses bash because `wait -n` is not supported by dash/sh.
 set -e
 
 : "${PORT:=5000}"
@@ -26,6 +27,7 @@ trap 'kill -TERM $GUNICORN_PID $WORKER_PID 2>/dev/null; wait' TERM INT
 
 # Exit as soon as either process dies -> Railway restarts
 wait -n $GUNICORN_PID $WORKER_PID
-echo "[entrypoint] a process exited; shutting down container"
+EXIT_CODE=$?
+echo "[entrypoint] a process exited (code=$EXIT_CODE); shutting down container"
 kill -TERM $GUNICORN_PID $WORKER_PID 2>/dev/null || true
-exit 1
+exit $EXIT_CODE

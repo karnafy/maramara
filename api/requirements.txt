@@ -54,7 +54,6 @@ scipy>=1.11.0
 librosa>=0.10.1
 soundfile>=0.12.1
 pydub>=0.25.1
-webrtcvad>=2.0.10
 
 # ----- NLP (Hebrew + English) -----
 transformers>=4.40.0

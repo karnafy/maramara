@@ -109,14 +109,48 @@ git clone --depth 1 https://github.com/affaan-m/everything-claude-code.git
 → To create `maramara-prod`, either upgrade to Pro or pause/delete one.
 
 ### Railway
-- **Status:** Pending valid Account Token from user
-- **Earlier token** `528c5cf1-61c9-4e75-979d-723687db0a0d` failed `whoami` (invalid/expired)
-- **Next step:** Get new token from https://railway.com/account/tokens
-- **Planned projects:** `maramara-dev` + `maramara-prod`
+| Field | Value |
+|-------|-------|
+| Workspace | `karnafy's Projects` |
+| Token type | **Team/Workspace Token** (uses Bearer auth, cannot query `me`) |
+| Token | `bc3596e0-c1f1-4872-b95a-cbbbef1073eb` (rotate after handoff) |
+| Note | Railway CLI `railway whoami` fails with team tokens — use GraphQL API |
+
+#### Projects
+
+**maramara-dev**
+- Project ID: `eea1deb6-21f7-4cf8-812a-22a358ef3fc6`
+- Environment ID: `5f900729-c9fe-4766-9788-f135c2d2301a` (default `production`)
+- Redis service ID: `85cd82bd-b555-49e8-95d1-451d80af07b7`
+- Dashboard: https://railway.com/project/eea1deb6-21f7-4cf8-812a-22a358ef3fc6
+
+**maramara-prod**
+- Project ID: `bf0bf164-c3c5-40e5-bd82-44eadf8aa5e3`
+- Environment ID: `551cd4eb-0fa2-49cb-aa19-3115a615c1e7` (default `production`)
+- Redis service ID: `89f287f1-427d-4570-b4ef-eef2bbcf73fc`
+- Dashboard: https://railway.com/project/bf0bf164-c3c5-40e5-bd82-44eadf8aa5e3
+
+#### Env vars already set (both projects)
+
+`APP_ENV`, `FLASK_ENV`, `DEBUG`, `LOG_LEVEL`, `SUPABASE_URL`,
+`SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_PROJECT_REF`,
+`DATABASE_URL`, `DB_PASSWORD`, `SECRET_KEY` (unique per env),
+`DEFAULT_LANGUAGE`, `SUPPORTED_LANGUAGES`, `CREWAI_MODEL`,
+`RETAIN_RAW_AUDIO`, `ENABLE_CREWAI_INSIGHTS`,
+`SPEAKER_SIMILARITY_THRESHOLD`, `VAD_THRESHOLD`, `WHISPER_MODEL`,
+`WHISPER_DEVICE`, `AUDIO_CHUNK_DURATION_SEC`, `AUDIO_SAMPLE_RATE`.
+
+#### Still TODO (user action required)
+
+- [ ] Add `ANTHROPIC_API_KEY` to both projects (via Railway dashboard → project → Variables)
+- [ ] Add `REDIS_URL` reference: `${{Redis.REDIS_URL}}` (once first deploy exposes it)
+- [ ] Create `api` service from GitHub repo (after repo is pushed)
+- [ ] Create `worker` service using `Dockerfile.worker`
 
 ### GitHub
-- **Planned repo:** single repo `karnafy/maramara`
-- **Auth:** pending `gh auth login` in new session
+- **Repo:** `karnafy/maramara` (private) — https://github.com/karnafy/maramara
+- **Auth:** Fine-grained PAT with `All repositories` + `Contents: Read/Write`
+- **Token (rotate after handoff):** `github_pat_11B26EK4Y0iZ12LUkZhcfz_...`
 
 ---
 

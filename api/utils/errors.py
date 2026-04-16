@@ -72,4 +72,9 @@ def register_error_handlers(app: Flask) -> None:
 
 
 def _is_api_request() -> bool:
-    return request.path.startswith("/api/") or request.accept_mimetypes.best == "application/json"
+    return (
+        "/api/" in request.path
+        or request.path.startswith("/auth/api")
+        or request.accept_mimetypes.best == "application/json"
+        or request.is_json
+    )

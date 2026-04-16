@@ -1,7 +1,11 @@
-"""Background job queue (RQ + Redis) with sync fallback for local dev."""
+"""Background job queue (RQ + Redis) with sync fallback for local dev.
+
+Audio is persisted to Supabase Storage before enqueue; the worker only
+receives the storage path and downloads the bytes itself. This keeps RQ
+job payloads small and makes failed jobs re-runnable.
+"""
 from __future__ import annotations
 
-import base64
 from functools import lru_cache
 
 from config import get_settings
@@ -26,20 +30,20 @@ def _get_queue():
         return None
 
 
-def enqueue_segment_processing(segment_id: str, user_id: str, audio_bytes: bytes) -> str:
-    b64 = base64.b64encode(audio_bytes).decode("ascii")
+def enqueue_segment_processing(segment_id: str, user_id: str, audio_path: str) -> str:
+    """Enqueue the full pipeline for a segment whose audio already lives in Storage."""
     q = _get_queue()
     if q is not None:
         job = q.enqueue(
             "workers.process_segment.run",
-            segment_id, user_id, b64,
+            segment_id, user_id, audio_path,
             job_timeout=600, result_ttl=3600,
         )
-        log.info("segment_enqueued", segment_id=segment_id, job_id=job.id)
+        log.info("segment_enqueued", segment_id=segment_id, job_id=job.id, path=audio_path)
         return job.id
     from workers.process_segment import run as run_segment
     try:
-        run_segment(segment_id, user_id, b64)
+        run_segment(segment_id, user_id, audio_path)
     except Exception:
         log.exception("sync_segment_failed", segment_id=segment_id)
     return "sync"

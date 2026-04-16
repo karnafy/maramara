@@ -41,11 +41,11 @@
   // Restore recording state from sessionStorage (survives page navigation in same tab)
   const STATE_KEY = 'maramara.recordingActive';
   const COUNTER_KEY = 'maramara.recordedChunks';
-  const CHUNK_SECONDS = 10;
-  const INTERVAL_SECONDS = 15;
+  const CHUNK_SECONDS = 10;  // each timeslice emitted as an independent file
 
   let mediaStream = null;
-  let intervalId = null;
+  let mediaRecorder = null;
+  let chunkStartedAt = null;
   let isActive = false;
 
   const pod = document.getElementById('maramara-recorder');
@@ -72,38 +72,20 @@
     return types.find(t => MediaRecorder.isTypeSupported(t)) || '';
   }
 
-  async function recordChunk() {
-    const stream = await ensureMic();
-    return new Promise((resolve, reject) => {
-      const mt = pickMimeType();
-      const rec = new MediaRecorder(stream, mt ? { mimeType: mt } : {});
-      const chunks = [];
-      rec.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
-      rec.onerror = reject;
-      rec.onstop = () => resolve(new Blob(chunks, { type: mt || 'audio/webm' }));
-      rec.start();
-      setTimeout(() => rec.state !== 'inactive' && rec.stop(), CHUNK_SECONDS * 1000);
-    });
-  }
-
-  async function uploadChunk(blob) {
-    const startedAt = new Date(Date.now() - CHUNK_SECONDS * 1000).toISOString();
-    const endedAt = new Date().toISOString();
+  async function uploadChunk(blob, startedAtIso, endedAtIso) {
     const fd = new FormData();
     fd.append('audio', blob, 'chunk.webm');
     fd.append('duration_sec', String(CHUNK_SECONDS));
-    fd.append('started_at', startedAt);
-    fd.append('ended_at', endedAt);
-    const res = await fetch('/api/audio/chunk', { method: 'POST', body: fd, credentials: 'include' });
-    return res.json().catch(() => null);
-  }
-
-  async function loop() {
+    fd.append('started_at', startedAtIso);
+    fd.append('ended_at', endedAtIso);
     try {
-      const blob = await recordChunk();
-      await uploadChunk(blob);
-      setCount(getCount() + 1);
-    } catch (e) { /* swallow */ }
+      const res = await fetch('/api/audio/chunk', { method: 'POST', body: fd, credentials: 'include' });
+      const data = await res.json().catch(() => null);
+      if (data?.success && data.data?.segment_id) setCount(getCount() + 1);
+      return data;
+    } catch (e) {
+      return null;
+    }
   }
 
   async function start() {
@@ -114,20 +96,38 @@
       sessionStorage.removeItem(STATE_KEY);
       return false;
     }
+
+    const mt = pickMimeType();
+    mediaRecorder = new MediaRecorder(mediaStream, mt ? { mimeType: mt } : {});
+    chunkStartedAt = new Date();
+
+    mediaRecorder.ondataavailable = (e) => {
+      if (!e.data || !e.data.size) return;
+      const startedIso = chunkStartedAt.toISOString();
+      const endedIso = new Date().toISOString();
+      chunkStartedAt = new Date();
+      const blob = new Blob([e.data], { type: mt || 'audio/webm' });
+      uploadChunk(blob, startedIso, endedIso);
+    };
+    mediaRecorder.onerror = (e) => { console.error('MediaRecorder error', e); };
+
+    // One continuous recording that emits a chunk every CHUNK_SECONDS — no gap, no overlap.
+    mediaRecorder.start(CHUNK_SECONDS * 1000);
+
     isActive = true;
     sessionStorage.setItem(STATE_KEY, '1');
     showPod();
     updateCounter();
-    loop();
-    intervalId = setInterval(loop, INTERVAL_SECONDS * 1000);
     return true;
   }
 
   function stop() {
     isActive = false;
     sessionStorage.removeItem(STATE_KEY);
-    if (intervalId) clearInterval(intervalId);
-    intervalId = null;
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+      try { mediaRecorder.stop(); } catch (_) {}
+    }
+    mediaRecorder = null;
     if (mediaStream) { mediaStream.getTracks().forEach(t => t.stop()); mediaStream = null; }
     hidePod();
     window.dispatchEvent(new Event('maramara:stopped'));

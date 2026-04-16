@@ -67,6 +67,9 @@ class Settings(BaseSettings):
     enrollment_min_duration_sec: int = 30
     enrollment_max_duration_sec: int = 45
 
+    # ----- Storage -----
+    audio_storage_bucket: str = "recordings"
+
     # ----- Features -----
     retain_raw_audio: bool = False
     enable_realtime: bool = True

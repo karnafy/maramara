@@ -34,15 +34,17 @@ class TranscriptionService:
 
         try:
             buf = io.BytesIO(audio_bytes)
-            buf.name = "chunk.wav"  # OpenAI needs a filename for content-type
+            buf.name = "chunk.webm"  # OpenAI needs a filename for content-type detection
+            # Without a language hint Whisper hallucinates English on silent/noisy audio.
+            # Default to the app's configured language (Hebrew by default).
+            lang = language or get_settings().default_language or "he"
             params = {
                 "model": self.MODEL,
                 "file": buf,
                 "response_format": "verbose_json",
                 "temperature": 0,
+                "language": lang,
             }
-            if language:
-                params["language"] = language
             resp = _client().audio.transcriptions.create(**params)
 
             text = (resp.text or "").strip()
@@ -51,7 +53,9 @@ class TranscriptionService:
             avg_logprob = 0.0
             segs = getattr(resp, "segments", None) or []
             if segs:
-                avg_logprob = sum(s.get("avg_logprob", 0) for s in segs) / len(segs)
+                def _avg(s):
+                    return s["avg_logprob"] if isinstance(s, dict) else getattr(s, "avg_logprob", 0) or 0
+                avg_logprob = sum(_avg(s) for s in segs) / len(segs)
             import math
             confidence = min(max(math.exp(avg_logprob), 0.0), 1.0) if avg_logprob else 0.85
 

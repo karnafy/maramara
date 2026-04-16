@@ -23,14 +23,19 @@ SYSTEM_PROMPT_HE = """אתה מנתח דיבור טיפולי. קבל קטע ש�
 - self_criticism_score: 0-1
 - absolutism_score: 0-1 ("תמיד","אף פעם","בכלל")
 - blame_score: 0-1
-- primary_topic: קטגוריה (work/relationships/family/health/money/self/environment/other)
-- secondary_topic: קטגוריה משנית או null
+- laugh_score: 0-1 (כמה צחוק/הומור/שמחה בקטע — בהתבסס על חיוך לשוני, בדיחות, "חחח", "מצחיק")
+- joy_score: 0-1 (כמה הנאה/התלהבות/אושר מפורש)
+- worry_score: 0-1 (כמה דאגה/חרדה/פחד)
+- anger_score: 0-1 (כמה כעס/עצבים/תסכול)
+- primary_topic: קטגוריה בעברית קצרה (עבודה/זוגיות/משפחה/בריאות/כסף/עצמי/סביבה/אחר)
+- secondary_topic: קטגוריה משנית בעברית או null
+- topic_mood: אחד מ "happy","worrying","annoying","neutral" — מה המצב הרגשי סביב הנושא
 - trigger_detected: true אם יש טריגר ברור
 - trigger_description: תיאור קצר בעברית (מקסימום 120 תווים) או null
 - calming_detected: true אם יש אלמנט מרגיע
 - calming_description: תיאור קצר בעברית (מקסימום 120 תווים) או null
 - cognitive_patterns: מערך של ["catastrophizing","all_or_nothing","personalization","should_statements","mind_reading","filtering"] - רק מה שקיים
-- tags: מערך של עד 5 מילות מפתח חשובות
+- tags: מערך של עד 5 מילות מפתח חשובות בעברית
 - detected_terms: מערך אובייקטים {term, type} כאשר type הוא positive/negative/curse/trigger/calming/gratitude/self_criticism/absolutist
 
 החזר JSON בלבד, ללא הסבר, ללא Markdown."""
@@ -106,8 +111,13 @@ class AnalysisService:
             "self_criticism_score": 0.0,
             "absolutism_score": 0.0,
             "blame_score": 0.0,
-            "primary_topic": "other",
+            "laugh_score": 0.0,
+            "joy_score": 0.0,
+            "worry_score": 0.0,
+            "anger_score": 0.0,
+            "primary_topic": "אחר",
             "secondary_topic": None,
+            "topic_mood": "neutral",
             "trigger_detected": False,
             "trigger_description": None,
             "calming_detected": False,

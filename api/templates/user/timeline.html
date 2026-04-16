@@ -24,7 +24,9 @@
 </section>
 
 <script>
+(function () {
 const dateInput = document.getElementById('dateInput');
+if (!dateInput) return;
 dateInput.value = new Date().toISOString().slice(0, 10);
 
 async function loadTimeline(date) {
@@ -80,5 +82,6 @@ function drawTimeline(segments) {
 
 dateInput.addEventListener('change', () => loadTimeline(dateInput.value));
 loadTimeline(dateInput.value);
+})();
 </script>
 {% endblock %}

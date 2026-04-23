@@ -6,6 +6,7 @@ from datetime import date
 from config import get_settings
 from db.supabase_client import init_supabase_client
 from services.crew import WeeklyInsightCrew
+from services.obsidian import ObsidianExporter
 from utils.logger import get_logger
 
 log = get_logger(__name__)
@@ -21,3 +22,11 @@ def run(user_id: str, week_start_iso: str) -> None:
     crew = WeeklyInsightCrew(user_id, week_start)
     crew.run()
     log.info("weekly_crew_completed", user=user_id, week=week_start_iso)
+
+    # Best-effort export to Obsidian vault; never fail the job on export errors.
+    try:
+        note = ObsidianExporter().export_weekly(user_id, week_start)
+        if note:
+            log.info("obsidian_weekly_written", path=str(note.path))
+    except Exception:
+        log.exception("obsidian_export_failed", user=user_id, week=week_start_iso)

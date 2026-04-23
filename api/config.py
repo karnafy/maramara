@@ -70,6 +70,11 @@ class Settings(BaseSettings):
     # ----- Storage -----
     audio_storage_bucket: str = "recordings"
 
+    # ----- Obsidian export -----
+    obsidian_vault_path: str = ""
+    obsidian_insights_dir: str = "MARAMARA-Insights"
+    enable_obsidian_export: bool = False
+
     # ----- Features -----
     retain_raw_audio: bool = False
     enable_realtime: bool = True

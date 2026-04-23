@@ -184,6 +184,30 @@ def migrate_apply():
             console.print(f"  [red]✗ {r.text[:200]}[/red]")
 
 
+# ---------------- obsidian ----------------
+@cli.group()
+def obsidian():
+    """Obsidian vault exports."""
+
+
+@obsidian.command("export-weekly")
+@click.argument("email")
+@click.option("--week-start", default=None, help="ISO date (default: this Monday)")
+def obsidian_export_weekly(email: str, week_start: str | None):
+    from services.obsidian import ObsidianExporter
+    admin = get_admin_client()
+    u = admin.table("profiles").select("id").eq("email", email).execute()
+    if not u.data:
+        console.print("[red]User not found[/red]")
+        return
+    ws = week_start or (date.today() - timedelta(days=date.today().weekday())).isoformat()
+    note = ObsidianExporter().export_weekly(u.data[0]["id"], date.fromisoformat(ws))
+    if note:
+        console.print(f"[green]Wrote[/green] {note.path}")
+    else:
+        console.print("[yellow]Skipped (export disabled or no weekly_metrics row).[/yellow]")
+
+
 # ---------------- doctor ----------------
 @cli.command()
 def doctor():

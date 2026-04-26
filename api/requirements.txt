@@ -1,6 +1,6 @@
 # ============================================================
 # MARAMARA API - Python Dependencies (slim edition)
-# Python 3.11 (conda env: KARNAF)
+# Python 3.12 (conda env: IVRIT)
 #
 # ML inference runs via HTTP APIs (OpenAI Whisper, Claude).
 # Heavy local ML (torch/whisper/speechbrain) can be re-added

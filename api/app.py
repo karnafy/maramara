@@ -91,6 +91,7 @@ def _register_blueprints(app: Flask) -> None:
     from routes.therapist import bp as therapist_bp
     from routes.reports import bp as reports_bp
     from routes.admin import bp as admin_bp
+    from routes.connect import bp as connect_bp
 
     app.register_blueprint(auth_bp, url_prefix="/auth")
     app.register_blueprint(voice_bp, url_prefix="/voice")
@@ -100,6 +101,8 @@ def _register_blueprints(app: Flask) -> None:
     app.register_blueprint(therapist_bp, url_prefix="/therapist")
     app.register_blueprint(reports_bp, url_prefix="/reports")
     app.register_blueprint(admin_bp, url_prefix="/admin")
+    # connect_bp uses absolute paths internally (/connect/<token>, /dashboard/api/share-link)
+    app.register_blueprint(connect_bp)
 
 
 app = create_app()

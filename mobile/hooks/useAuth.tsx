@@ -45,7 +45,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const me = await api.auth.me();
       setProfile(me);
-    } catch {}
+    } catch {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) return;
+      const { data } = await supabase
+        .from("profiles")
+        .select("id,email,role,full_name,language,onboarding_completed")
+        .eq("id", session.user.id)
+        .maybeSingle();
+      if (data) setProfile(data as Profile);
+    }
   };
 
   return (

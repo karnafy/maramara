@@ -16,7 +16,7 @@ backend but see different UIs.
 
 ## Stack
 
-- **Backend:** Flask 3 + Python 3.11 (conda env `KARNAF`)
+- **Backend:** Flask 3 + Python 3.12 (conda env `IVRIT`)
 - **Database:** Supabase (Postgres 17 + pgvector + RLS)
 - **Jobs:** RQ + Redis
 - **AI:** CrewAI (10 therapeutic agents) + Claude Sonnet 4.6 + faster-whisper large-v3 + SpeechBrain ECAPA + Silero VAD
@@ -39,8 +39,8 @@ git clone https://github.com/karnafy/maramara.git
 cd maramara
 
 # 2. Python environment
-conda create -n KARNAF python=3.11 -y
-conda activate KARNAF
+conda create -n IVRIT python=3.12 -y
+conda activate IVRIT
 pip install -r api/requirements.txt
 
 # 3. Environment variables

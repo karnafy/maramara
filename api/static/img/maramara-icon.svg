@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="MARAMARA">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#8b7cf0"/>
+      <stop offset="100%" stop-color="#6b5ce7"/>
+    </linearGradient>
+  </defs>
+  <rect x="0" y="0" width="512" height="512" rx="110" ry="110" fill="url(#bg)"/>
+  <path d="M 108 392 L 108 136 L 176 136 L 256 300 L 336 136 L 404 136 L 404 392 L 344 392 L 344 236 L 284 360 L 228 360 L 168 236 L 168 392 Z"
+        fill="#ffffff"/>
+</svg>

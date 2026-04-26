@@ -1,7 +1,7 @@
 """Global Flask error handlers."""
 from __future__ import annotations
 
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, redirect, request, session, url_for
 from pydantic import ValidationError
 
 
@@ -48,6 +48,10 @@ def register_error_handlers(app: Flask) -> None:
                 "success": False,
                 "error": {"code": err.error_code, "message": err.message},
             }), err.status_code
+        # HTML request with expired/invalid session → clear + redirect to login
+        if isinstance(err, AuthError):
+            session.clear()
+            return redirect(url_for("auth.login_page"))
         return err.message, err.status_code
 
     @app.errorhandler(ValidationError)

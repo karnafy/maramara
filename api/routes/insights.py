@@ -79,11 +79,24 @@ def weekly():
 @bp.get("/live")
 @require_auth
 def live():
-    """Live aggregations from segment_analysis (no CrewAI needed)."""
+    """Live aggregations from segment_analysis (no CrewAI needed).
+
+    Supports ?range=day|week|month|year (default: week).
+    """
     from collections import Counter
     admin = get_admin_client()
     from datetime import datetime, timedelta, timezone
-    since = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
+
+    window_days = {"day": 1, "week": 7, "month": 30, "year": 365}
+    rng = (request.args.get("range") or "week").lower()
+    if rng not in window_days:
+        rng = "week"
+    # PostgREST-safe timestamp: the "+00:00" suffix breaks URL encoding when sent
+    # as a query-param filter (the "+" becomes a space). Strip microseconds and
+    # use the Z suffix.
+    since = (datetime.now(timezone.utc) - timedelta(days=window_days[rng])).replace(
+        microsecond=0, tzinfo=None
+    ).isoformat() + "Z"
 
     analyses = admin.table("segment_analysis").select(
         "polarity,intensity_score,complaint_score,curse_score,calming_score,"
@@ -98,16 +111,58 @@ def live():
         "transcript_text,created_at,language,word_count"
     ).eq("user_id", g.user_id).gte("created_at", since).execute()
 
+    try:
+        segments = admin.table("audio_segments").select(
+            "duration_sec,started_at"
+        ).eq("user_id", g.user_id).gte("started_at", since).execute()
+        seg_error = None
+        seglist = segments.data or []
+    except Exception as e:
+        seg_error = f"{type(e).__name__}: {e}"
+        seglist = []
+
     rows = analyses.data or []
     tlist = transcripts.data or []
+    total_duration_sec = sum(float(s.get("duration_sec") or 0) for s in seglist)
+    # Debug info exposed in response for troubleshooting; remove once stable.
+    _debug = {
+        "since": since,
+        "user_id": g.user_id,
+        "segments_fetched": len(seglist),
+        "total_duration_sec": total_duration_sec,
+        "seg_error": seg_error,
+    }
 
     if not rows:
         return jsonify({"success": True, "data": {
             "segment_count": 0,
+            "total_duration_sec": total_duration_sec,
             "total_words": 0,
+            "_debug": _debug,
         }})
 
     polarity_counts = Counter(r["polarity"] for r in rows if r.get("polarity"))
+
+    # Finer-grained split: positive segments are divided into "strong" vs "mild"
+    # based on intensity_score (>=6 is strong). This gives us 5 categories that
+    # map 1:1 to the 5 colored zones on the mood gauge.
+    STRONG_INTENSITY = 6.0
+    polarity_detailed: dict[str, int] = {
+        "strong_negative": 0, "negative": 0, "neutral": 0,
+        "mixed": 0, "positive": 0, "strong_positive": 0,
+    }
+    for r in rows:
+        p = r.get("polarity")
+        i = float(r.get("intensity_score") or 0)
+        if p == "negative":
+            key = "strong_negative" if i >= STRONG_INTENSITY else "negative"
+        elif p == "positive":
+            key = "strong_positive" if i >= STRONG_INTENSITY else "positive"
+        elif p == "mixed":
+            key = "mixed"
+        else:
+            key = "neutral"
+        polarity_detailed[key] = polarity_detailed.get(key, 0) + 1
     topics = Counter(r["primary_topic"] for r in rows if r.get("primary_topic"))
 
     triggers = [
@@ -125,7 +180,7 @@ def live():
         for p in (r.get("cognitive_patterns") or []):
             cog[p] += 1
 
-    # Hourly intensity heatmap
+    # Hourly intensity heatmap (kept for backwards compatibility)
     hourly: dict[int, list[float]] = {}
     for r in rows:
         try:
@@ -134,6 +189,86 @@ def live():
             continue
         hourly.setdefault(h, []).append(r.get("intensity_score") or 0)
     hourly_avg = {h: sum(v) / len(v) for h, v in hourly.items()}
+
+    # Range-aware intensity buckets: day→24 hours, week→7 days,
+    # month→30 days, year→12 months. Each value is average intensity.
+    HEB_DAYS = ['א', 'ב', 'ג', 'ד', 'ה', 'ו', 'ש']
+    HEB_MONTHS = ['ינו', 'פבר', 'מרץ', 'אפר', 'מאי', 'יונ',
+                  'יול', 'אוג', 'ספט', 'אוק', 'נוב', 'דצמ']
+    now = datetime.now(timezone.utc)
+    if rng == "day":
+        buckets = [{"label": f"{h:02d}", "sum": 0.0, "n": 0} for h in range(24)]
+        for r in rows:
+            try:
+                t = datetime.fromisoformat(r["created_at"].replace("Z", "+00:00"))
+            except Exception:
+                continue
+            b = buckets[t.hour]
+            b["sum"] += float(r.get("intensity_score") or 0)
+            b["n"] += 1
+    elif rng == "week":
+        start = (now - timedelta(days=6)).date()
+        buckets = []
+        for i in range(7):
+            d = start + timedelta(days=i)
+            buckets.append({"date": d, "label": HEB_DAYS[(d.weekday() + 1) % 7],
+                            "sum": 0.0, "n": 0})
+        for r in rows:
+            try:
+                t = datetime.fromisoformat(r["created_at"].replace("Z", "+00:00")).date()
+            except Exception:
+                continue
+            for b in buckets:
+                if b["date"] == t:
+                    b["sum"] += float(r.get("intensity_score") or 0)
+                    b["n"] += 1
+                    break
+    elif rng == "month":
+        start = (now - timedelta(days=29)).date()
+        buckets = []
+        for i in range(30):
+            d = start + timedelta(days=i)
+            label = f"{d.day}/{d.month}" if i % 5 == 0 or i == 29 else ""
+            buckets.append({"date": d, "label": label, "sum": 0.0, "n": 0})
+        for r in rows:
+            try:
+                t = datetime.fromisoformat(r["created_at"].replace("Z", "+00:00")).date()
+            except Exception:
+                continue
+            for b in buckets:
+                if b["date"] == t:
+                    b["sum"] += float(r.get("intensity_score") or 0)
+                    b["n"] += 1
+                    break
+    else:  # year
+        buckets = []
+        ym = now
+        for i in range(12):
+            delta_months = 11 - i
+            y = ym.year
+            m = ym.month - delta_months
+            while m <= 0:
+                m += 12
+                y -= 1
+            buckets.append({"ym": (y, m), "label": HEB_MONTHS[m - 1],
+                            "sum": 0.0, "n": 0})
+        for r in rows:
+            try:
+                t = datetime.fromisoformat(r["created_at"].replace("Z", "+00:00"))
+            except Exception:
+                continue
+            for b in buckets:
+                if b["ym"] == (t.year, t.month):
+                    b["sum"] += float(r.get("intensity_score") or 0)
+                    b["n"] += 1
+                    break
+
+    intensity_buckets = [
+        {"label": b["label"],
+         "value": (b["sum"] / b["n"]) if b["n"] else 0.0,
+         "count": b["n"]}
+        for b in buckets
+    ]
 
     # Top tags
     tag_counts = Counter()
@@ -151,15 +286,20 @@ def live():
     intensity_avg = sum((r.get("intensity_score") or 0) for r in rows) / len(rows)
 
     return jsonify({"success": True, "data": {
+        "range": rng,
         "segment_count": len(rows),
         "total_words": total_words,
         "languages": languages.most_common(),
         "polarity_distribution": dict(polarity_counts),
+        "polarity_detailed": polarity_detailed,
+        "total_duration_sec": total_duration_sec,
         "top_topics": topics.most_common(8),
         "triggers": triggers,
         "calming": calming,
         "cognitive_patterns": cog.most_common(),
         "hourly_intensity": hourly_avg,
+        "intensity_buckets": intensity_buckets,
+        "_debug": _debug,
         "top_tags": tag_counts.most_common(12),
         "self_criticism_avg": self_critic_avg,
         "intensity_avg": intensity_avg,

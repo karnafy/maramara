@@ -7,7 +7,7 @@ from datetime import date, datetime, timedelta, timezone
 from flask import Blueprint, g, jsonify, render_template, request
 from pydantic import BaseModel, EmailStr, Field
 
-from utils.auth import require_auth, require_role
+from utils.auth import require_role
 from utils.errors import AppError, ForbiddenError, NotFoundError
 from db.supabase_client import get_admin_client
 
@@ -104,6 +104,103 @@ def api_patients():
         "id,status,accepted_at,patient:profiles!patient_id(id,full_name,email,language)"
     ).eq("therapist_id", g.user_id).execute()
     return jsonify({"success": True, "data": links.data or []})
+
+
+@bp.get("/api/patients/gallery")
+@require_role("therapist", "admin")
+def api_patients_gallery():
+    """Live gallery: each active patient + mood score + last activity."""
+    from collections import Counter
+
+    admin = get_admin_client()
+    since = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
+
+    links_resp = (
+        admin.table("therapist_patient_links")
+        .select("patient:profiles!patient_id(id,full_name,email)")
+        .eq("therapist_id", g.user_id)
+        .eq("status", "active")
+        .execute()
+    )
+    patients = [l["patient"] for l in (links_resp.data or []) if l.get("patient")]
+    if not patients:
+        return jsonify({"success": True, "data": []})
+
+    patient_ids = [p["id"] for p in patients]
+
+    analyses = (
+        admin.table("segment_analysis")
+        .select("user_id,polarity,intensity_score,created_at")
+        .in_("user_id", patient_ids)
+        .gte("created_at", since)
+        .execute()
+        .data
+        or []
+    )
+
+    latest = (
+        admin.table("audio_segments")
+        .select("user_id,started_at")
+        .in_("user_id", patient_ids)
+        .order("started_at", desc=True)
+        .limit(500)
+        .execute()
+        .data
+        or []
+    )
+
+    # Aggregate per patient
+    per_patient: dict[str, dict] = {}
+    for pid in patient_ids:
+        per_patient[pid] = {
+            "pos": 0, "neg": 0, "neu": 0, "mix": 0,
+            "segments_7d": 0,
+            "intensity_sum": 0.0,
+            "intensity_n": 0,
+            "last_active": None,
+        }
+    for a in analyses:
+        pid = a.get("user_id")
+        if pid not in per_patient:
+            continue
+        b = per_patient[pid]
+        b["segments_7d"] += 1
+        p = a.get("polarity")
+        if p == "positive": b["pos"] += 1
+        elif p == "negative": b["neg"] += 1
+        elif p == "neutral": b["neu"] += 1
+        elif p == "mixed": b["mix"] += 1
+        if a.get("intensity_score"):
+            b["intensity_sum"] += float(a["intensity_score"])
+            b["intensity_n"] += 1
+    for row in latest:
+        pid = row.get("user_id")
+        if pid in per_patient and per_patient[pid]["last_active"] is None:
+            per_patient[pid]["last_active"] = row.get("started_at")
+
+    def mood(b):
+        total = b["pos"] + b["neg"] + b["neu"] + b["mix"]
+        if not total:
+            return 0.0
+        return (b["pos"] - b["neg"]) / total
+
+    gallery = []
+    for p in patients:
+        b = per_patient[p["id"]]
+        total = b["pos"] + b["neg"] + b["neu"] + b["mix"]
+        gallery.append({
+            "id": p["id"],
+            "full_name": p.get("full_name") or p.get("email"),
+            "email": p.get("email"),
+            "mood_score": round(mood(b), 3),
+            "segments_7d": b["segments_7d"],
+            "intensity_avg": round(b["intensity_sum"] / b["intensity_n"], 2) if b["intensity_n"] else 0.0,
+            "polarity": {"positive": b["pos"], "negative": b["neg"], "neutral": b["neu"], "mixed": b["mix"]},
+            "total_polarity": total,
+            "last_active": b["last_active"],
+        })
+
+    return jsonify({"success": True, "data": gallery})
 
 
 @bp.get("/api/patients/<patient_id>/overview")

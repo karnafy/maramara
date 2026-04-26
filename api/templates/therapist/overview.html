@@ -2,41 +2,46 @@
 {% block title %}מטופלים — MARAMARA{% endblock %}
 
 {% block content %}
+{% include 'partials/_mood_gauge.html' %}
+
 <section class="therapist-overview">
   <header class="dashboard__header">
-    <h1>המטופלים שלך</h1>
+    <div>
+      <h1>המטופלים שלך</h1>
+      <p style="color:var(--text-muted);margin:4px 0 0;">מצב רוח חי של כל מטופל פעיל, מתעדכן כל 30 שניות.</p>
+    </div>
     <button class="btn btn--primary" id="inviteBtn">הזמן מטופל חדש</button>
   </header>
 
   <div class="grid grid--4">
-    <div class="kpi"><span class="kpi__label">מטופלים פעילים</span><span class="kpi__value">{{ links | length }}</span></div>
+    <div class="kpi"><span class="kpi__label">מטופלים פעילים</span><span class="kpi__value">{{ links | selectattr('status', 'equalto', 'active') | list | length }}</span></div>
     <div class="kpi"><span class="kpi__label">המתנה לאישור</span><span class="kpi__value">{{ links | selectattr('status', 'equalto', 'pending') | list | length }}</span></div>
     <div class="kpi"><span class="kpi__label">דגלי סיכון</span><span class="kpi__value" id="riskCount">—</span></div>
-    <div class="kpi"><span class="kpi__label">דוחות שבועיים</span><span class="kpi__value" id="reportCount">—</span></div>
+    <div class="kpi"><span class="kpi__label">סה״כ מקושרים</span><span class="kpi__value">{{ links | length }}</span></div>
   </div>
 
-  <table class="data-table">
-    <thead>
-      <tr>
-        <th>שם</th><th>סטטוס</th><th>מגמת שבוע</th><th>טריגר ראשי</th><th>דגל סיכון</th><th>פעיל לאחרונה</th><th></th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for link in links %}
-        <tr>
-          <td>{{ link.patient.full_name or link.patient.email }}</td>
-          <td><span class="badge badge--{{ link.status }}">{{ link.status }}</span></td>
-          <td>—</td>
-          <td>—</td>
-          <td>—</td>
-          <td>{{ link.accepted_at or '—' }}</td>
-          <td><a href="/therapist/patients/{{ link.patient.id }}" class="btn btn--ghost btn--sm">פתח</a></td>
-        </tr>
-      {% else %}
-        <tr><td colspan="7" class="empty">עדיין אין מטופלים. הזמן את הראשון.</td></tr>
-      {% endfor %}
-    </tbody>
-  </table>
+  <section id="gallery" class="patient-gallery" aria-label="מטופלים פעילים">
+    <div class="patient-gallery__empty" id="galleryEmpty" hidden>
+      <h3>עוד אין מטופלים פעילים</h3>
+      <p>לחץ "הזמן מטופל חדש" או בקש ממטופל לייצר קישור שיתוף אצלו בהגדרות.</p>
+    </div>
+  </section>
+
+  {% set pending = links | selectattr('status', 'equalto', 'pending') | list %}
+  {% if pending %}
+    <section class="pending-section">
+      <h2>ממתינים לאישור המטופל</h2>
+      <ul class="pending-list">
+        {% for link in pending %}
+          <li>
+            <strong>{{ link.patient.full_name or link.patient.email }}</strong>
+            <span>{{ link.patient.email }}</span>
+            <span class="badge badge--pending">ממתין</span>
+          </li>
+        {% endfor %}
+      </ul>
+    </section>
+  {% endif %}
 </section>
 
 <dialog id="inviteDialog" class="dialog">
@@ -52,6 +57,146 @@
     </div>
   </form>
 </dialog>
+
+<style>
+  .patient-gallery {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: var(--space-5);
+    margin-top: var(--space-6);
+  }
+  .patient-gallery__empty {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: var(--space-8);
+    background: var(--glass-surface-low);
+    border-radius: var(--radius-2xl);
+    color: var(--text-muted);
+  }
+  .patient-gallery__empty h3 { color: var(--text); margin: 0 0 var(--space-2); }
+
+  .patient-card {
+    background: rgba(255,255,255,0.78);
+    border: 1px solid rgba(255,255,255,0.6);
+    border-radius: var(--radius-2xl);
+    padding: var(--space-5) var(--space-5) var(--space-4);
+    box-shadow: var(--inner-top), var(--shadow-md);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    text-decoration: none;
+    color: inherit;
+    transition: transform 200ms ease, box-shadow 200ms ease;
+    position: relative;
+  }
+  .patient-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 14px 40px rgba(16, 67, 86, 0.14);
+  }
+  .patient-card__head {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+  }
+  .patient-card__avatar {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #8b7cf0, #6b5ce7);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 1.1rem;
+    flex-shrink: 0;
+  }
+  .patient-card__name {
+    font-weight: 700;
+    color: #104356;
+    line-height: 1.2;
+  }
+  .patient-card__email {
+    color: var(--text-muted);
+    font-size: 0.78rem;
+    margin-top: 2px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .patient-card__gauge {
+    margin: var(--space-2) auto;
+    max-width: 220px;
+    width: 100%;
+  }
+  .patient-card__stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-3);
+    padding-top: var(--space-3);
+    border-top: 1px dashed rgba(107,92,231,0.18);
+  }
+  .patient-card__stat span:first-child {
+    display: block;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+  }
+  .patient-card__stat strong {
+    font-size: 1.1rem;
+    color: #104356;
+  }
+  .patient-card__pulse {
+    position: absolute;
+    top: 12px;
+    inset-inline-end: 12px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #94a3b8;
+  }
+  .patient-card__pulse.is-fresh {
+    background: #10b981;
+    box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.2);
+    animation: pulse-fresh 2s ease-in-out infinite;
+  }
+  @keyframes pulse-fresh {
+    0%, 100% { box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.2); }
+    50%      { box-shadow: 0 0 0 8px rgba(16, 185, 129, 0.08); }
+  }
+
+  .pending-section { margin-top: var(--space-8); }
+  .pending-section h2 {
+    font-size: 1.1rem;
+    color: var(--text-muted);
+    margin: 0 0 var(--space-3);
+  }
+  .pending-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+  .pending-list li {
+    background: var(--glass-surface-low);
+    padding: var(--space-3) var(--space-4);
+    border-radius: var(--radius-lg);
+    display: flex;
+    gap: var(--space-4);
+    align-items: center;
+  }
+  .pending-list li span { color: var(--text-muted); font-size: 0.9rem; }
+  .badge--pending {
+    margin-inline-start: auto;
+    background: #fef3c7;
+    color: #92400e;
+    padding: 2px 10px;
+    border-radius: 999px;
+    font-size: 0.8rem;
+    font-weight: 600;
+  }
+</style>
 
 <script>
 const dialog = document.getElementById('inviteDialog');
@@ -75,5 +220,91 @@ document.getElementById('inviteForm').addEventListener('submit', async (e) => {
     alert(data.error?.message || 'שגיאה');
   }
 });
+
+// -------- Live patient gallery --------
+const gallery = document.getElementById('gallery');
+const emptyBox = document.getElementById('galleryEmpty');
+
+function timeAgoHe(iso) {
+  if (!iso) return 'עוד לא פעיל';
+  const d = new Date(iso);
+  const mins = Math.floor((Date.now() - d.getTime()) / 60000);
+  if (mins < 1) return 'עכשיו';
+  if (mins < 60) return `לפני ${mins} דק׳`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `לפני ${hrs} שע׳`;
+  const days = Math.floor(hrs / 24);
+  return `לפני ${days} ימים`;
+}
+
+function isFresh(iso, withinMinutes = 10) {
+  if (!iso) return false;
+  return (Date.now() - new Date(iso).getTime()) < withinMinutes * 60 * 1000;
+}
+
+async function loadGallery() {
+  try {
+    const res = await fetch('/therapist/api/patients/gallery', { credentials: 'include' });
+    const body = await res.json();
+    const patients = body.data || [];
+
+    if (!patients.length) {
+      gallery.innerHTML = '';
+      gallery.appendChild(emptyBox);
+      emptyBox.hidden = false;
+      return;
+    }
+    emptyBox.hidden = true;
+
+    gallery.innerHTML = '';
+    for (const p of patients) {
+      const card = document.createElement('a');
+      card.className = 'patient-card';
+      card.href = `/therapist/patients/${p.id}`;
+      const initial = (p.full_name || p.email || '?').slice(0, 1).toUpperCase();
+
+      card.innerHTML = `
+        <span class="patient-card__pulse ${isFresh(p.last_active) ? 'is-fresh' : ''}" title="${timeAgoHe(p.last_active)}"></span>
+        <div class="patient-card__head">
+          <span class="patient-card__avatar">${initial}</span>
+          <div style="min-width:0;flex:1;">
+            <div class="patient-card__name">${escapeHtml(p.full_name)}</div>
+            <div class="patient-card__email">${escapeHtml(p.email || '')}</div>
+          </div>
+        </div>
+        <div class="patient-card__gauge" id="gauge-${p.id}"></div>
+        <div class="patient-card__stats">
+          <div class="patient-card__stat">
+            <span>קטעים (7 ימים)</span>
+            <strong>${p.segments_7d}</strong>
+          </div>
+          <div class="patient-card__stat">
+            <span>פעיל לאחרונה</span>
+            <strong>${timeAgoHe(p.last_active)}</strong>
+          </div>
+        </div>
+      `;
+      gallery.appendChild(card);
+
+      // Render gauge
+      window.MARAMARA.renderMoodGauge(
+        document.getElementById(`gauge-${p.id}`),
+        p.mood_score,
+        { size: 220, subtitle: `${p.total_polarity} קטעים בשבוע` }
+      );
+    }
+  } catch (e) {
+    console.error('gallery load failed', e);
+  }
+}
+
+function escapeHtml(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c =>
+    ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+loadGallery();
+const galleryTimer = setInterval(loadGallery, 30000);
+window.addEventListener('maramara:navigated', () => clearInterval(galleryTimer));
 </script>
 {% endblock %}

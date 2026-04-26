@@ -1,11 +1,16 @@
-{# Floating persistent recorder pod - keeps recording across page navigation via sessionStorage flag #}
+{# Floating persistent recorder pod — shown on every page while recording.
+   A red pulsing dot signals the live state; click anywhere on the pod to
+   stop. Uses client-side VAD (Web Audio AnalyserNode) so MediaRecorder
+   only runs when speech is detected. Survives page navigation via
+   sessionStorage. Also drives the equalizer canvas inside any
+   [data-listen-toggle] orb on the current page. #}
 <div id="maramara-recorder" class="rec-pod" hidden aria-live="polite">
-  <div class="rec-pod__ring"></div>
+  <span class="rec-pod__dot" id="recPodDot" aria-hidden="true"></span>
   <div class="rec-pod__label">
-    <div class="rec-pod__title">מקשיב...</div>
-    <div class="rec-pod__counter">0 קטעים הועלו</div>
+    <div class="rec-pod__title" id="recPodTitle">מאזין</div>
+    <div class="rec-pod__counter">0 קטעים נשלחו</div>
   </div>
-  <button id="recPodStop" class="btn btn--sm btn--ghost">עצור</button>
+  <button id="recPodStop" class="rec-pod__stop" type="button">עצור</button>
 </div>
 
 <style>
@@ -13,58 +18,194 @@
     position: fixed;
     bottom: var(--space-6);
     inset-inline-start: var(--space-6);
-    z-index: var(--z-toast);
+    z-index: var(--z-toast, 9999);
     display: flex;
     align-items: center;
     gap: var(--space-3);
-    padding: var(--space-3) var(--space-5);
-    background: var(--glass-surface-high);
+    padding: var(--space-3) var(--space-4);
+    background: rgba(255, 255, 255, 0.92);
     backdrop-filter: blur(var(--blur-md)) saturate(180%);
     -webkit-backdrop-filter: blur(var(--blur-md)) saturate(180%);
-    border-radius: var(--radius-full);
-    box-shadow: var(--inner-top), var(--shadow-lg);
+    border: 1px solid rgba(255, 255, 255, 0.8);
+    border-radius: 999px;
+    box-shadow: 0 12px 40px rgba(16, 67, 86, 0.18);
   }
-  .rec-pod__ring {
+  .rec-pod__dot {
     width: 14px;
     height: 14px;
     border-radius: 50%;
-    background: var(--accent-purple);
-    box-shadow: 0 0 0 4px rgba(168, 126, 255, 0.3);
-    animation: breathing-ring var(--duration-breathing) var(--ease-breathing) infinite;
+    background: #ef4444;
+    box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.22);
+    animation: rec-pulse 1.4s ease-in-out infinite;
   }
-  .rec-pod__title { font-weight: 700; font-size: var(--body-sm); }
-  .rec-pod__counter { font-family: var(--font-label); font-size: var(--label-md); color: var(--text-muted); }
+  @keyframes rec-pulse {
+    0%, 100% { transform: scale(1); box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.22); }
+    50%      { transform: scale(1.15); box-shadow: 0 0 0 8px rgba(239, 68, 68, 0.08); }
+  }
+  .rec-pod__title {
+    font-weight: 700;
+    font-size: 0.9rem;
+    color: var(--text, #0f172a);
+  }
+  .rec-pod__counter {
+    font-family: var(--font-label, var(--font-body));
+    font-size: 0.75rem;
+    color: var(--text-muted, #64748b);
+  }
+  .rec-pod__stop {
+    appearance: none;
+    border: 0;
+    cursor: pointer;
+    padding: 6px 14px;
+    border-radius: 999px;
+    background: #ef4444;
+    color: #fff;
+    font-weight: 700;
+    font-size: 0.85rem;
+    transition: filter 150ms ease;
+  }
+  .rec-pod__stop:hover { filter: brightness(1.1); }
 </style>
 
 <script>
-(function() {
-  // Restore recording state from sessionStorage (survives page navigation in same tab)
+(function () {
   const STATE_KEY = 'maramara.recordingActive';
   const COUNTER_KEY = 'maramara.recordedChunks';
-  const CHUNK_SECONDS = 10;  // each timeslice emitted as an independent file
+
+  // VAD tuning ---------------------------------------------------------------
+  // Speech is detected when RMS exceeds BOTH an absolute floor AND a multiple
+  // of the tracked ambient noise floor. This rejects fan/keyboard/room hum
+  // that sit just above the old fixed threshold of 0.012.
+  const SPEECH_RMS_ABS_MIN   = 0.03;   // absolute floor (~ -30 dBFS)
+  const SPEECH_RMS_MARGIN    = 3.0;    // must be Nx the rolling noise floor
+  const NOISE_FLOOR_INIT     = 0.008;
+  const NOISE_FLOOR_ALPHA    = 0.02;   // EMA smoothing (~1s of silence to adapt)
+  const SPEECH_MIN_MS        = 450;    // sustained speech required (rejects transients)
+  const TRAILING_SILENCE_MS  = 1200;
+  const MIN_CHUNK_MS         = 1200;   // discard <1.2s chunks (likely false triggers)
+  const MAX_CHUNK_MS         = 20000;
+  const ANALYSIS_INTERVAL_MS = 80;
+
+  let noiseFloor = NOISE_FLOOR_INIT;
 
   let mediaStream = null;
+  let audioCtx = null;
+  let analyser = null;
+  let timeBuffer = null;
+  let freqBuffer = null;
+
   let mediaRecorder = null;
-  let chunkStartedAt = null;
+  let recorderMime = '';
+
+  let analyseTimer = null;
+  let rafId = null;
+  let voiceStartedAt = 0;
+  let recordingStartedAt = 0;
+  let lastVoiceAt = 0;
+  let watchdogTimer = null;
+
   let isActive = false;
+
+  // Long-session resilience -------------------------------------------------
+  // The app must be able to keep listening for days as long as the tab is
+  // open. Three hazards to guard against:
+  //   1) Screen/tab sleep → Wake Lock API.
+  //   2) Tab backgrounded → visibilitychange handler re-acquires lock + re-checks stream.
+  //   3) Mic track silently ends (OS suspend / Bluetooth drop) → heartbeat re-opens it.
+  let wakeLock = null;
+  let heartbeatTimer = null;
+  const HEARTBEAT_MS = 60_000;  // check every minute — light enough to not wake a sleeping CPU
 
   const pod = document.getElementById('maramara-recorder');
   const counterEl = pod?.querySelector('.rec-pod__counter');
   const stopBtn = document.getElementById('recPodStop');
+  const titleEl = document.getElementById('recPodTitle');
 
   function getCount() { return parseInt(sessionStorage.getItem(COUNTER_KEY) || '0', 10); }
   function setCount(n) { sessionStorage.setItem(COUNTER_KEY, String(n)); updateCounter(); }
-  function updateCounter() { if (counterEl) counterEl.textContent = `${getCount()} קטעים הועלו`; }
-
+  function updateCounter() { if (counterEl) counterEl.textContent = `${getCount()} קטעים נשלחו`; }
   function showPod() { if (pod) pod.hidden = false; }
   function hidePod() { if (pod) pod.hidden = true; }
 
+  function setRecordingUI(speechActive) {
+    if (titleEl) titleEl.textContent = speechActive ? 'מקליט דיבור' : 'מאזין';
+  }
+
   async function ensureMic() {
-    if (mediaStream) return mediaStream;
+    if (mediaStream && isStreamAlive(mediaStream)) return mediaStream;
+    // Drop any dead reference before re-acquiring.
+    if (mediaStream) { try { mediaStream.getTracks().forEach(t => t.stop()); } catch (_) {} mediaStream = null; }
     mediaStream = await navigator.mediaDevices.getUserMedia({
       audio: { channelCount: 1, sampleRate: 16000, echoCancellation: true, noiseSuppression: true },
     });
     return mediaStream;
+  }
+
+  function isStreamAlive(stream) {
+    if (!stream) return false;
+    const tracks = stream.getAudioTracks();
+    if (!tracks.length) return false;
+    // A track is dead if readyState==='ended' or muted due to OS-level revoke.
+    return tracks.some(t => t.readyState === 'live');
+  }
+
+  // ---------- Wake Lock (screen) ----------
+  // Prevents the phone/laptop from sleeping while the user is listening.
+  // Released automatically by the browser when the tab becomes hidden — we
+  // re-acquire it in the visibilitychange handler.
+  async function acquireWakeLock() {
+    if (!('wakeLock' in navigator)) return;
+    try {
+      wakeLock = await navigator.wakeLock.request('screen');
+      wakeLock.addEventListener?.('release', () => { wakeLock = null; });
+    } catch (err) {
+      // Permission denied or unsupported context — recording still continues,
+      // just without a guarantee that the screen stays on.
+      console.warn('wakeLock request failed', err?.name || err);
+    }
+  }
+
+  function releaseWakeLock() {
+    if (!wakeLock) return;
+    try { wakeLock.release(); } catch (_) {}
+    wakeLock = null;
+  }
+
+  // ---------- Health heartbeat ----------
+  // Once a minute: confirm the mic track is still live and the VAD loop is
+  // ticking. Recover silently if something died.
+  async function heartbeatTick() {
+    if (!isActive) return;
+    const alive = isStreamAlive(mediaStream);
+    if (!alive) {
+      try {
+        await ensureMic();
+        buildAnalyser();
+      } catch (err) {
+        console.warn('heartbeat: failed to re-acquire mic', err);
+      }
+    }
+    // If the wake lock was released by the OS while we stayed active
+    // (e.g. returning from background), try again.
+    if (isActive && !wakeLock && document.visibilityState === 'visible') {
+      acquireWakeLock();
+    }
+  }
+
+  // ---------- Visibility handling ----------
+  // Wake Lock is auto-released when the document becomes hidden. We also use
+  // this event to immediately run a health check on return, so stale streams
+  // are repaired before the user even notices.
+  function onVisibilityChange() {
+    if (!isActive) return;
+    if (document.visibilityState === 'visible') {
+      acquireWakeLock();
+      // iOS Safari suspends AudioContext in the background; resume it.
+      if (audioCtx && audioCtx.state === 'suspended') {
+        audioCtx.resume().catch(() => {});
+      }
+      heartbeatTick();
+    }
   }
 
   function pickMimeType() {
@@ -72,80 +213,236 @@
     return types.find(t => MediaRecorder.isTypeSupported(t)) || '';
   }
 
-  async function uploadChunk(blob, startedAtIso, endedAtIso) {
+  function buildAnalyser() {
+    // Close any prior context before opening a new one so the heartbeat
+    // recovery path doesn't leak AudioContexts over multi-day sessions.
+    if (audioCtx) { try { audioCtx.close(); } catch (_) {} audioCtx = null; }
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    audioCtx = new Ctx();
+    const src = audioCtx.createMediaStreamSource(mediaStream);
+    analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 1024;
+    analyser.smoothingTimeConstant = 0.82;
+    timeBuffer = new Float32Array(analyser.fftSize);
+    freqBuffer = new Uint8Array(analyser.frequencyBinCount);
+    src.connect(analyser);
+  }
+
+  function currentRms() {
+    analyser.getFloatTimeDomainData(timeBuffer);
+    let sum = 0;
+    for (let i = 0; i < timeBuffer.length; i++) sum += timeBuffer[i] * timeBuffer[i];
+    return Math.sqrt(sum / timeBuffer.length);
+  }
+
+  // ---------- equalizer (sits under the orb on the page background) ----------
+  function drawEqualizers() {
+    if (!analyser) { rafId = null; return; }
+    analyser.getByteFrequencyData(freqBuffer);
+    const bars = 36;
+    const binStep = Math.floor((freqBuffer.length / 2) / bars); // lower half = voice range
+    document.querySelectorAll('.listen-orb__eq').forEach(canvas => {
+      const ctx = canvas.getContext('2d');
+      const w = canvas.width;
+      const h = canvas.height;
+      ctx.clearRect(0, 0, w, h);
+      const slot = w / bars;
+      const barW = slot * 0.55;
+      const cy = h / 2;
+      for (let i = 0; i < bars; i++) {
+        const v = freqBuffer[i * binStep] / 255;
+        const bh = Math.max(3, v * h * 0.9);
+        const x = i * slot + (slot - barW) / 2;
+        const y = cy - bh / 2;
+        // Gradient purple → teal (matches brand)
+        const grad = ctx.createLinearGradient(0, y, 0, y + bh);
+        grad.addColorStop(0, 'rgba(139, 124, 240, 0.95)');
+        grad.addColorStop(1, 'rgba(109, 213, 237, 0.85)');
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        if (ctx.roundRect) ctx.roundRect(x, y, barW, bh, barW / 2);
+        else ctx.rect(x, y, barW, bh);
+        ctx.fill();
+      }
+    });
+    rafId = requestAnimationFrame(drawEqualizers);
+  }
+
+  function setEqActive(on) {
+    document.querySelectorAll('.listen-orb__eq').forEach(c => {
+      c.classList.toggle('is-active', !!on);
+      if (!on) {
+        const cx = c.getContext('2d');
+        cx.clearRect(0, 0, c.width, c.height);
+      }
+    });
+  }
+
+  // Directly sync every orb on the page so the UI never gets stuck on the
+  // wrong state if an external listener (e.g. home.html syncListenState)
+  // fails to fire — e.g. after an SPA navigation that replaced <main>.
+  function updateAllOrbs(active) {
+    document.querySelectorAll('[data-listen-toggle]').forEach(b => {
+      b.classList.toggle('listen-orb--active', !!active);
+      const lbl = b.querySelector('.listen-orb__label');
+      if (lbl) lbl.textContent = active ? 'עצור האזנה' : 'התחל האזנה';
+    });
+  }
+
+  function startRecorder() {
+    const chunks = [];
+    mediaRecorder = new MediaRecorder(mediaStream, recorderMime ? { mimeType: recorderMime } : {});
+    mediaRecorder.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
+    mediaRecorder.onerror = (ev) => console.error('MediaRecorder error', ev);
+    mediaRecorder.onstop = () => {
+      const blob = new Blob(chunks, { type: recorderMime || 'audio/webm' });
+      const durationMs = Date.now() - recordingStartedAt;
+      if (blob.size > 0 && durationMs >= MIN_CHUNK_MS) {
+        uploadChunk(blob, new Date(recordingStartedAt), new Date(), durationMs);
+      }
+      mediaRecorder = null;
+    };
+    mediaRecorder.start();
+    recordingStartedAt = Date.now();
+    clearTimeout(watchdogTimer);
+    watchdogTimer = setTimeout(() => {
+      if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+        try { mediaRecorder.stop(); } catch (_) {}
+      }
+    }, MAX_CHUNK_MS);
+  }
+
+  function stopRecorder() {
+    clearTimeout(watchdogTimer);
+    watchdogTimer = null;
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+      try { mediaRecorder.stop(); } catch (_) {}
+    }
+  }
+
+  async function uploadChunk(blob, startedAt, endedAt, durationMs) {
     const fd = new FormData();
     fd.append('audio', blob, 'chunk.webm');
-    fd.append('duration_sec', String(CHUNK_SECONDS));
-    fd.append('started_at', startedAtIso);
-    fd.append('ended_at', endedAtIso);
+    fd.append('duration_sec', (durationMs / 1000).toFixed(2));
+    fd.append('started_at', startedAt.toISOString());
+    fd.append('ended_at', endedAt.toISOString());
     try {
       const res = await fetch('/api/audio/chunk', { method: 'POST', body: fd, credentials: 'include' });
       const data = await res.json().catch(() => null);
       if (data?.success && data.data?.segment_id) setCount(getCount() + 1);
       return data;
-    } catch (e) {
+    } catch (_) {
       return null;
+    }
+  }
+
+  function analyseTick() {
+    if (!analyser) return;
+    const now = Date.now();
+    const rms = currentRms();
+    const speaking = rms > SPEECH_RMS_ABS_MIN && rms > noiseFloor * SPEECH_RMS_MARGIN;
+
+    // Track ambient noise floor only while NOT speaking — so it reflects
+    // the room, not the user. Slow EMA prevents a loud cough from poisoning it.
+    if (!speaking) {
+      noiseFloor = noiseFloor * (1 - NOISE_FLOOR_ALPHA) + rms * NOISE_FLOOR_ALPHA;
+    }
+
+    if (speaking) {
+      lastVoiceAt = now;
+      if (!voiceStartedAt) voiceStartedAt = now;
+      if (!mediaRecorder && now - voiceStartedAt >= SPEECH_MIN_MS) {
+        startRecorder();
+        setRecordingUI(true);
+      }
+    } else {
+      voiceStartedAt = 0;
+      if (mediaRecorder && now - lastVoiceAt >= TRAILING_SILENCE_MS) {
+        stopRecorder();
+        setRecordingUI(false);
+      }
     }
   }
 
   async function start() {
     try {
       await ensureMic();
+      buildAnalyser();
     } catch (e) {
       alert('לא ניתן לגשת למיקרופון: ' + e.message);
       sessionStorage.removeItem(STATE_KEY);
       return false;
     }
-
-    const mt = pickMimeType();
-    mediaRecorder = new MediaRecorder(mediaStream, mt ? { mimeType: mt } : {});
-    chunkStartedAt = new Date();
-
-    mediaRecorder.ondataavailable = (e) => {
-      if (!e.data || !e.data.size) return;
-      const startedIso = chunkStartedAt.toISOString();
-      const endedIso = new Date().toISOString();
-      chunkStartedAt = new Date();
-      const blob = new Blob([e.data], { type: mt || 'audio/webm' });
-      uploadChunk(blob, startedIso, endedIso);
-    };
-    mediaRecorder.onerror = (e) => { console.error('MediaRecorder error', e); };
-
-    // One continuous recording that emits a chunk every CHUNK_SECONDS — no gap, no overlap.
-    mediaRecorder.start(CHUNK_SECONDS * 1000);
-
+    recorderMime = pickMimeType();
     isActive = true;
     sessionStorage.setItem(STATE_KEY, '1');
     showPod();
+    setRecordingUI(false);
     updateCounter();
+    voiceStartedAt = 0;
+    lastVoiceAt = 0;
+    noiseFloor = NOISE_FLOOR_INIT;
+    analyseTimer = setInterval(analyseTick, ANALYSIS_INTERVAL_MS);
+    if (!rafId) rafId = requestAnimationFrame(drawEqualizers);
+    setEqActive(true);
+    updateAllOrbs(true);
+    // Keep the session alive through OS sleep / tab backgrounding.
+    acquireWakeLock();
+    if (!heartbeatTimer) heartbeatTimer = setInterval(heartbeatTick, HEARTBEAT_MS);
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    window.dispatchEvent(new Event('maramara:started'));
     return true;
   }
 
   function stop() {
     isActive = false;
     sessionStorage.removeItem(STATE_KEY);
-    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-      try { mediaRecorder.stop(); } catch (_) {}
-    }
-    mediaRecorder = null;
+    clearInterval(analyseTimer); analyseTimer = null;
+    clearInterval(heartbeatTimer); heartbeatTimer = null;
+    document.removeEventListener('visibilitychange', onVisibilityChange);
+    releaseWakeLock();
+    if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
+    stopRecorder();
+    if (audioCtx) { try { audioCtx.close(); } catch (_) {} audioCtx = null; }
+    analyser = null;
     if (mediaStream) { mediaStream.getTracks().forEach(t => t.stop()); mediaStream = null; }
+    setEqActive(false);
     hidePod();
+    updateAllOrbs(false);
     window.dispatchEvent(new Event('maramara:stopped'));
+  }
+
+  async function toggle() {
+    if (isActive) { stop(); }
+    else { await start(); }
   }
 
   // Public API
   window.MARAMARA_RECORDER = {
-    start, stop,
+    start, stop, toggle,
     isActive: () => isActive,
     getCount, setCount, updateCounter,
   };
 
-  // Auto-resume if previous page left the flag set
+  // Auto-resume ONLY if the user explicitly started recording earlier in THIS tab.
+  // sessionStorage is per-tab and cleared when the tab/browser closes, so a
+  // fresh app open never auto-starts the mic — the user must press the orb.
+  // Once started, recording persists across SPA navigations and page reloads
+  // for as long as the tab stays open (which is what the "days in background"
+  // requirement depends on, together with the wake lock + heartbeat above).
   if (sessionStorage.getItem(STATE_KEY) === '1') {
-    // Delay slightly so the page finishes loading
     setTimeout(() => start(), 500);
   }
 
+  // Wire handlers
   stopBtn?.addEventListener('click', stop);
+  document.addEventListener('click', (e) => {
+    if (e.target.closest?.('#recPodStop')) { stop(); return; }
+    const orb = e.target.closest?.('[data-listen-toggle]');
+    if (orb) {
+      e.preventDefault();
+      toggle();
+    }
+  });
 })();
 </script>

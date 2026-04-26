@@ -38,10 +38,100 @@
     <button class="btn btn--ghost">אמן מחדש</button>
   </section>
 
+  <section class="panel">
+    <h3>שיתוף עם מטפל</h3>
+    <p style="color:var(--text-muted);margin:0 0 12px">צור קישור חד-פעמי ושלח אותו למטפל שלך. הוא יוכל לראות את התובנות שלך בזמן אמת לאחר אישור.</p>
+    <button class="btn btn--primary" id="shareLinkBtn" type="button">צור קישור למטפל</button>
+    <div id="shareLinkBox" style="display:none;margin-top:12px;">
+      <div style="display:flex;gap:8px;align-items:center;">
+        <input id="shareLinkInput" class="form__input" readonly style="flex:1;direction:ltr;text-align:left;" />
+        <button class="btn btn--ghost" type="button" id="shareCopyBtn">העתק</button>
+        <a class="btn btn--ghost" id="shareWhatsapp" target="_blank" rel="noopener">שלח ב־WhatsApp</a>
+      </div>
+      <p style="color:var(--text-muted);font-size:0.8rem;margin:8px 0 0;">הקישור תקף ל־30 יום.</p>
+    </div>
+  </section>
+
   <section class="panel panel--danger">
     <h3>פעולות רגישות</h3>
-    <button class="btn btn--ghost">ייצוא כל הנתונים שלי</button>
-    <button class="btn btn--danger">מחיקת חשבון לצמיתות</button>
+    <button class="btn btn--ghost" id="exportPdfBtn" type="button">ייצוא דוח PDF מעוצב</button>
+    <a class="btn btn--ghost" href="/dashboard/api/export" download style="margin-inline-start:8px;">ייצוא CSV גולמי</a>
+    <button class="btn btn--danger" type="button">מחיקת חשבון לצמיתות</button>
+    <p id="exportStatus" class="settings__hint" style="margin-top:10px;color:var(--text-muted);display:none;"></p>
   </section>
 </section>
+
+<script>
+(function () {
+  // ---------- Share-link flow ----------
+  const shareBtn = document.getElementById('shareLinkBtn');
+  const shareBox = document.getElementById('shareLinkBox');
+  const shareInput = document.getElementById('shareLinkInput');
+  const shareCopy = document.getElementById('shareCopyBtn');
+  const shareWa = document.getElementById('shareWhatsapp');
+
+  shareBtn?.addEventListener('click', async () => {
+    shareBtn.disabled = true;
+    shareBtn.textContent = 'מייצר קישור...';
+    try {
+      const res = await fetch('/dashboard/api/share-link', { method: 'POST', credentials: 'include' });
+      const body = await res.json();
+      if (!body.success) throw new Error(body.error?.message || 'שגיאה');
+      shareInput.value = body.data.url;
+      shareBox.style.display = 'block';
+      const msg = encodeURIComponent(`שלום, זה קישור MARAMARA שלי. אישור יחבר אותנו: ${body.data.url}`);
+      shareWa.href = `https://wa.me/?text=${msg}`;
+      shareBtn.textContent = 'צור קישור חדש';
+    } catch (err) {
+      alert('שגיאה: ' + err.message);
+      shareBtn.textContent = 'צור קישור למטפל';
+    } finally {
+      shareBtn.disabled = false;
+    }
+  });
+
+  shareCopy?.addEventListener('click', async () => {
+    try { await navigator.clipboard.writeText(shareInput.value); shareCopy.textContent = 'הועתק'; }
+    catch (_) { shareInput.select(); document.execCommand('copy'); shareCopy.textContent = 'הועתק'; }
+    setTimeout(() => { shareCopy.textContent = 'העתק'; }, 1600);
+  });
+
+  // ---------- PDF export ----------
+  const btn = document.getElementById('exportPdfBtn');
+  const status = document.getElementById('exportStatus');
+  if (!btn) return;
+
+  btn.addEventListener('click', async () => {
+    const originalText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'מכין דוח...';
+    if (status) {
+      status.style.display = 'block';
+      status.textContent = 'Claude מנתח את הנתונים שלך — זה עשוי לקחת עד דקה.';
+    }
+    try {
+      const res = await fetch('/dashboard/api/export/pdf', { credentials: 'include' });
+      if (!res.ok) {
+        const text = await res.text().catch(() => '');
+        throw new Error(text || `שגיאה ${res.status}`);
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `maramara-report-${new Date().toISOString().slice(0, 10)}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      if (status) status.textContent = 'הדוח ירד בהצלחה.';
+    } catch (err) {
+      if (status) status.textContent = 'שגיאה ביצוא: ' + (err.message || 'נסה שוב מאוחר יותר');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = originalText;
+    }
+  });
+})();
+</script>
 {% endblock %}

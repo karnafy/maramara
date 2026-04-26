@@ -2,12 +2,18 @@
 {% block title %}תובנות — MARAMARA{% endblock %}
 
 {% block content %}
+{% include 'partials/_mood_gauge.html' %}
 <section class="insights-page">
-  <header class="dashboard__header">
-    <h1>התובנות שלך (7 ימים אחרונים)</h1>
-    <button class="btn btn--primary" id="genWeekly">צור תובנות AI מורחבות (CrewAI)</button>
+  <header class="insights-head">
+    <div>
+      <h1>התובנות שלך</h1>
+      <p class="insights-head__sub" id="summaryLead">טוען…</p>
+    </div>
+    <div class="insights-head__actions">
+      <button class="btn btn--ghost" id="shareBtn" type="button">שתף</button>
+      <button class="btn btn--primary" id="genWeekly">צור תובנות AI מורחבות</button>
+    </div>
   </header>
-  <p class="lead" id="summaryLead">טוען...</p>
 
   <div id="emptyState" class="panel" hidden>
     <h3>אין עדיין נתונים</h3>
@@ -15,230 +21,1255 @@
   </div>
 
   <div id="content" hidden>
-    <div class="grid grid--4">
-      <div class="kpi"><span class="kpi__label">קטעים נותחו</span><span class="kpi__value" id="segCount">—</span></div>
-      <div class="kpi"><span class="kpi__label">מילים</span><span class="kpi__value" id="wordCount">—</span></div>
-      <div class="kpi"><span class="kpi__label">עוצמה ממוצעת</span><span class="kpi__value" id="intensityAvg">—</span></div>
-      <div class="kpi kpi--negative"><span class="kpi__label">ביקורת עצמית</span><span class="kpi__value" id="selfCritic">—</span></div>
+
+    <!-- Range tabs — full width bar above everything -->
+    <div class="range-tabs-bar">
+      <div class="range-tabs" role="tablist" aria-label="טווח זמן">
+        <button class="range-tab" data-range="day"   type="button">יום</button>
+        <button class="range-tab is-active" data-range="week" type="button">שבוע</button>
+        <button class="range-tab" data-range="month" type="button">חודש</button>
+        <button class="range-tab" data-range="year"  type="button">שנה</button>
+      </div>
     </div>
 
-    <div class="grid grid--2 insights-grid">
-      <article class="insight-card">
-        <h3>📊 התפלגות רגשית</h3>
-        <div id="polarityBar" class="self-talk-bar"></div>
-        <p id="polaritySummary" class="text-muted"></p>
-      </article>
+    <!-- HERO: big mood gauge — primary visual -->
+    <section class="mood-hero">
+      <div class="mood-hero__head">
+        <h2 class="mood-hero__title">מצב הרוח הכללי שלך</h2>
+        <p class="mood-hero__sub" id="moodHeroSub">השעון מראה את <strong>המגמה נטו</strong>: (חיובי − שלילי) ÷ סך הקטעים. 5 הצבעים של הסולם תואמים ל־5 הצ׳יפים למטה — אדום/כתום=שלילי חזק/מתון, אפור=ניטרלי, תכלת/ירוק=חיובי מתון/חזק.</p>
+      </div>
+      <div id="moodGauge" class="mood-hero__gauge"></div>
+    </section>
 
-      <article class="insight-card">
-        <h3>🌐 שפות</h3>
-        <div id="langs"></div>
-      </article>
+    <!-- Stat cards below the gauge -->
+    <section class="kpi-row kpi-row--4">
+      <div class="kpi-card">
+        <span class="kpi-card__label">קטעים נותחו</span>
+        <span class="kpi-card__value" id="segCount">—</span>
+      </div>
+      <div class="kpi-card">
+        <span class="kpi-card__label">מילים</span>
+        <span class="kpi-card__value" id="wordCount">—</span>
+      </div>
+      <div class="kpi-card">
+        <span class="kpi-card__label">זמן הקלטה</span>
+        <span class="kpi-card__value" id="totalDuration">—</span>
+        <span class="kpi-card__unit" id="totalDurationUnit">דקות</span>
+      </div>
+      <div class="kpi-card kpi-card--tension">
+        <span class="kpi-card__label">מידת המתח הרגשי</span>
+        <div class="kpi-card__tension-row">
+          <div class="kpi-card__smiley" id="intensitySmiley" aria-hidden="true"></div>
+          <span class="kpi-card__value" id="intensityAvg">—</span>
+        </div>
+        <span class="kpi-card__unit" id="intensityLabel">מתוך 10</span>
+      </div>
+    </section>
 
-      <article class="insight-card">
-        <h3>⚡ טריגרים אחרונים</h3>
-        <ul id="triggers" class="list">—</ul>
-      </article>
+    <section class="insights-section">
+      <h2 class="insights-section__title">התפלגות רגשית</h2>
+      <p class="insights-section__hint" id="polaritySummary"></p>
+      <div class="polarity-chips" id="polarityChips"></div>
+      <div class="stack-bar" id="polarityBar"></div>
+    </section>
 
-      <article class="insight-card">
-        <h3>🌿 רגעי הרגעה</h3>
-        <ul id="calming" class="list">—</ul>
-      </article>
+    <div class="insights-row">
+      <section class="insights-section">
+        <h2 class="insights-section__title">נושאים עיקריים</h2>
+        <div id="topics" class="bar-list"></div>
+      </section>
 
-      <article class="insight-card">
-        <h3>🎯 נושאים עיקריים</h3>
-        <div id="topics"></div>
-      </article>
+      <section class="insights-section">
+        <h2 class="insights-section__title">דפוסים קוגניטיביים</h2>
+        <div id="cogPatterns" class="bar-list"></div>
+      </section>
+    </div>
 
-      <article class="insight-card">
-        <h3>🧠 דפוסים קוגניטיביים</h3>
-        <div id="cogPatterns"></div>
-      </article>
+    <div class="insights-row">
+      <section class="insights-section">
+        <h2 class="insights-section__title">טריגרים אחרונים</h2>
+        <ul id="triggers" class="event-list event-list--neg">—</ul>
+      </section>
 
-      <article class="insight-card">
-        <h3>🏷️ מילות מפתח חוזרות</h3>
+      <section class="insights-section">
+        <h2 class="insights-section__title">רגעי הרגעה</h2>
+        <ul id="calming" class="event-list event-list--pos">—</ul>
+      </section>
+    </div>
+
+    <section class="insights-section">
+      <header class="chart-head">
+        <div class="chart-head__titles">
+          <h2 class="insights-section__title" id="intensityChartTitle">עוצמה לפי שעה</h2>
+          <p class="insights-section__hint" id="intensityChartSub">מציג את עוצמת הדיבור הממוצעת בכל שעה של היום האחרון.</p>
+        </div>
+        <div class="chart-range-tabs" role="tablist" aria-label="טווח הגרף">
+          <button class="chart-range-tab" data-chart-range="day"   type="button">יום</button>
+          <button class="chart-range-tab is-active" data-chart-range="week"  type="button">שבוע</button>
+          <button class="chart-range-tab" data-chart-range="month" type="button">חודש</button>
+          <button class="chart-range-tab" data-chart-range="year"  type="button">שנה</button>
+        </div>
+      </header>
+      <canvas id="hourlyChart" width="840" height="220" aria-label="Intensity timeline"></canvas>
+    </section>
+
+    <div class="insights-row">
+      <section class="insights-section">
+        <h2 class="insights-section__title">שפות</h2>
+        <div id="langs" class="lang-list"></div>
+      </section>
+
+      <section class="insights-section">
+        <h2 class="insights-section__title">מילות מפתח חוזרות</h2>
         <div id="tags" class="tag-cloud"></div>
-      </article>
-
-      <article class="insight-card">
-        <h3>⏰ עוצמה לפי שעה</h3>
-        <canvas id="hourlyChart" width="380" height="180"></canvas>
-      </article>
+      </section>
     </div>
 
-    <article class="insight-card insight-card--wide insight-card--primary" id="crewBox" hidden>
-      <h3>✨ תובנות CrewAI (10 סוכנים טיפוליים)</h3>
+    <section class="insights-section insights-section--primary" id="crewBox" hidden>
+      <h2 class="insights-section__title">תובנות CrewAI — 10 סוכנים טיפוליים</h2>
       <div id="crewContent"></div>
-    </article>
+    </section>
+
   </div>
 </section>
 
 <style>
-  .tag-cloud { display: flex; flex-wrap: wrap; gap: var(--space-2); }
-  .tag-cloud .chip { background: var(--glass-surface-high); padding: 4px 12px; border-radius: var(--radius-full); font-size: var(--label-lg); }
-  .bar-row { display: grid; grid-template-columns: 120px 1fr 50px; gap: var(--space-3); align-items: center; margin-bottom: var(--space-2); }
-  .bar-row .bar { height: 8px; background: var(--glass-surface-low); border-radius: var(--radius-full); overflow: hidden; }
-  .bar-row .bar span { display: block; height: 100%; background: linear-gradient(90deg, var(--accent-purple), var(--accent-teal)); }
-  .bar-row .name { font-family: var(--font-label); font-size: var(--label-lg); color: var(--text-muted); }
-  .bar-row .value { font-family: var(--font-label); font-size: var(--label-md); color: var(--text-muted); text-align: end; }
-  .text-muted { color: var(--text-muted); font-size: var(--body-sm); }
+  /* ====================================================
+     INSIGHTS PAGE — spacious, visual, no emojis
+     ==================================================== */
+  .insights-page {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: var(--space-6) var(--space-5);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-10);
+  }
+
+  .insights-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    gap: var(--space-6);
+    padding-bottom: var(--space-5);
+    border-bottom: 1px solid var(--glass-border, rgba(107,92,231,0.15));
+  }
+  .insights-head h1 {
+    margin: 0 0 var(--space-2);
+    font-family: var(--font-display, var(--font-body));
+    font-size: clamp(1.8rem, 4vw, 2.4rem);
+  }
+  .insights-head__sub { margin: 0; color: var(--text-muted); font-size: var(--body-md); }
+  .insights-head__actions {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: var(--space-3);
+  }
+
+  /* Range tabs */
+  .range-tabs {
+    display: inline-flex;
+    background: rgba(255,255,255,0.62);
+    border: 1px solid rgba(255,255,255,0.6);
+    border-radius: 999px;
+    padding: 4px;
+    gap: 2px;
+  }
+  .range-tab {
+    appearance: none;
+    border: 0;
+    background: transparent;
+    padding: 6px 14px;
+    border-radius: 999px;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 200ms ease;
+  }
+  .range-tab:hover { color: var(--text); }
+  .range-tab.is-active {
+    background: linear-gradient(135deg, #8b7cf0, #6b5ce7);
+    color: #fff;
+    box-shadow: 0 4px 12px rgba(107,92,231,0.35);
+  }
+
+  /* Range tabs bar — full width above everything */
+  .range-tabs-bar {
+    display: flex;
+    justify-content: center;
+    margin: 0 0 var(--space-5);
+  }
+
+  /* Mood hero — the primary card, big and prominent */
+  .mood-hero {
+    background: linear-gradient(135deg, rgba(139, 124, 240, 0.10), rgba(109, 213, 237, 0.10));
+    border: 1px solid rgba(255, 255, 255, 0.6);
+    border-radius: var(--radius-2xl);
+    padding: var(--space-6) var(--space-6) var(--space-5);
+    box-shadow: var(--inner-top), var(--shadow-md);
+    text-align: center;
+    margin-bottom: var(--space-5);
+  }
+  .mood-hero__head { margin-bottom: var(--space-4); }
+  .mood-hero__title {
+    margin: 0 0 var(--space-2);
+    font-family: var(--font-display, var(--font-body));
+    font-size: clamp(1.3rem, 3vw, 1.8rem);
+    color: var(--text, #104356);
+  }
+  .mood-hero__sub {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+  }
+  .mood-hero__gauge {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+  .mood-hero__gauge svg {
+    width: 100%;
+    max-width: 460px;
+    height: auto;
+  }
+
+  .kpi-row--3 { grid-template-columns: repeat(3, 1fr); }
+  .kpi-row--4 { grid-template-columns: repeat(4, 1fr); }
+  @media (max-width: 900px) {
+    .kpi-row--4 { grid-template-columns: repeat(2, 1fr); }
+  }
+  @media (max-width: 640px) {
+    .kpi-row--3 { grid-template-columns: repeat(2, 1fr); }
+    .kpi-row--4 { grid-template-columns: repeat(2, 1fr); }
+  }
+
+  /* KPI row */
+  .kpi-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: var(--space-5);
+  }
+  .kpi-card {
+    background: rgba(255, 255, 255, 0.78);
+    border: 1px solid rgba(255, 255, 255, 0.6);
+    border-radius: var(--radius-2xl);
+    padding: var(--space-5) var(--space-5);
+    display: grid;
+    grid-template-rows: 20px 1fr 18px;
+    row-gap: var(--space-2);
+    box-shadow: var(--inner-top), var(--shadow-md);
+    min-height: 160px;
+    text-align: start;
+  }
+  .kpi-card__label {
+    color: var(--text-muted);
+    font-family: var(--font-label, var(--font-body));
+    font-size: 0.8rem;
+    align-self: start;
+    line-height: 1.1;
+  }
+  .kpi-card__value {
+    font-family: var(--font-display, var(--font-body));
+    font-size: clamp(2rem, 4vw, 2.8rem);
+    font-weight: 800;
+    line-height: 1;
+    color: var(--accent-purple, #6b5ce7);
+    align-self: center;
+    display: flex;
+    align-items: center;
+    text-align: start;
+  }
+  .kpi-card__unit {
+    color: var(--text-muted);
+    font-size: 0.72rem;
+    align-self: end;
+    text-align: start;
+  }
+
+  /* Tension card: smiley SVG + number side by side */
+  .kpi-card--tension .kpi-card__tension-row {
+    align-self: center;
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+  }
+  .kpi-card__smiley svg {
+    display: block;
+    width: 56px;
+    height: 56px;
+  }
+  .kpi-card--tension .kpi-card__value { font-size: clamp(1.7rem, 3.2vw, 2.4rem); }
+  .kpi-card--accent .kpi-card__value { color: #ef4444; }
+  .kpi-card__bar {
+    grid-row: 3;
+    width: 100%;
+    height: 6px;
+    background: rgba(239, 68, 68, 0.12);
+    border-radius: var(--radius-full);
+    overflow: hidden;
+    align-self: end;
+  }
+  .kpi-card__bar span {
+    display: block;
+    height: 100%;
+    background: linear-gradient(90deg, #fca5a5, #ef4444);
+    transition: width 400ms ease;
+  }
+
+  /* Section */
+  .insights-section {
+    background: var(--glass-surface-low);
+    backdrop-filter: blur(var(--blur-md)) saturate(180%);
+    -webkit-backdrop-filter: blur(var(--blur-md)) saturate(180%);
+    border-radius: var(--radius-2xl);
+    padding: var(--space-7) var(--space-6);
+    box-shadow: var(--inner-top), var(--shadow-md);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-5);
+  }
+  .insights-section__title {
+    margin: 0;
+    font-size: var(--body-lg);
+    font-weight: 700;
+  }
+  .insights-section__hint {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: var(--body-sm);
+  }
+  .insights-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+    gap: var(--space-6);
+  }
+  .insights-section--primary {
+    background: linear-gradient(135deg, rgba(107,92,231,0.18), rgba(109,213,237,0.18));
+  }
+
+  /* Stack bar (polarity distribution) */
+  .stack-bar {
+    display: flex;
+    height: 28px;
+    border-radius: var(--radius-full);
+    overflow: hidden;
+    background: var(--glass-surface-high);
+  }
+  .stack-bar__slice {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-size: var(--label-sm, 0.75rem);
+    font-weight: 700;
+    transition: width 400ms ease;
+  }
+  /* 5 zones — identical palette to the gauge and the chips */
+  .stack-bar__slice--pos-strong { background: #10b981; }  /* ירוק */
+  .stack-bar__slice--pos-mild   { background: #6dd5ed; }  /* תכלת */
+  .stack-bar__slice--neu        { background: #94a3b8; }  /* אפור */
+  .stack-bar__slice--neg-mild   { background: #f97316; }  /* כתום */
+  .stack-bar__slice--neg-strong { background: #ef4444; }  /* אדום */
+  /* Legacy aliases — kept so older callers don't break */
+  .stack-bar__slice--pos { background: #10b981; }
+  .stack-bar__slice--neg { background: #ef4444; }
+  .stack-bar__slice--mix { background: #f59e0b; }
+
+  /* Polarity chips — 5 cards, one for each gauge zone. */
+  .polarity-chips {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: var(--space-3);
+    margin-bottom: var(--space-3);
+  }
+  .polarity-chip {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: var(--space-3);
+    background: rgba(255, 255, 255, 0.72);
+    border-radius: var(--radius-lg);
+    border: 1px solid rgba(255, 255, 255, 0.6);
+  }
+  .polarity-chip__dot {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+  }
+  .polarity-chip__name {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    font-weight: 600;
+  }
+  .polarity-chip__pct {
+    font-size: 1.4rem;
+    font-weight: 800;
+    color: var(--text, #104356);
+    line-height: 1;
+  }
+  .polarity-chip__count {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+  }
+  @media (max-width: 900px) {
+    .polarity-chips { grid-template-columns: repeat(3, 1fr); }
+  }
+  @media (max-width: 560px) {
+    .polarity-chips { grid-template-columns: repeat(2, 1fr); }
+    .polarity-chip__pct { font-size: 1.2rem; }
+  }
+  .stack-bar__legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-5);
+    font-size: var(--label-md, 0.85rem);
+    color: var(--text-muted);
+  }
+  .stack-bar__legend .swatch {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    margin-inline-end: var(--space-2);
+    vertical-align: middle;
+  }
+
+  /* Bar list (topics / patterns) */
+  .bar-list { display: flex; flex-direction: column; gap: var(--space-4); }
+  .bar-row {
+    display: grid;
+    grid-template-columns: 140px 1fr auto;
+    gap: var(--space-4);
+    align-items: center;
+  }
+  .bar-row .name { color: var(--text, inherit); font-size: var(--body-sm); }
+  .bar-row .bar {
+    height: 10px;
+    background: var(--glass-surface-high);
+    border-radius: var(--radius-full);
+    overflow: hidden;
+  }
+  .bar-row .bar span {
+    display: block;
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent-purple, #6b5ce7), var(--accent-teal, #6dd5ed));
+    transition: width 400ms ease;
+  }
+  .bar-row .value { color: var(--text-muted); font-size: var(--label-md, 0.85rem); }
+
+  /* Event lists (triggers / calming) */
+  .event-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+  }
+  .event-list li {
+    padding: var(--space-4);
+    border-inline-start: 3px solid var(--glass-border, rgba(107,92,231,0.3));
+    background: var(--glass-surface-high);
+    border-radius: var(--radius-lg);
+  }
+  .event-list--neg li { border-inline-start-color: #ef4444; }
+  .event-list--pos li { border-inline-start-color: #10b981; }
+  .event-list strong { display: block; margin-bottom: var(--space-1); }
+  .event-list small { color: var(--text-muted); display: block; margin-top: var(--space-1); }
+
+  /* Language list */
+  .lang-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+  }
+  .lang-row {
+    display: grid;
+    grid-template-columns: 100px 1fr auto;
+    gap: var(--space-4);
+    align-items: center;
+  }
+  .lang-row .bar {
+    height: 10px;
+    background: var(--glass-surface-high);
+    border-radius: var(--radius-full);
+    overflow: hidden;
+  }
+  .lang-row .bar span {
+    display: block;
+    height: 100%;
+    background: var(--accent-teal, #6dd5ed);
+    transition: width 400ms ease;
+  }
+
+  /* Tag cloud */
+  .tag-cloud { display: flex; flex-wrap: wrap; gap: var(--space-3); }
+  .tag-cloud .chip {
+    background: var(--glass-surface-high);
+    padding: var(--space-2) var(--space-4);
+    border-radius: var(--radius-full);
+    font-size: var(--label-lg, 0.9rem);
+  }
+  .tag-cloud .chip small { color: var(--text-muted); margin-inline-start: var(--space-2); }
+
+  canvas#hourlyChart {
+    width: 100%;
+    height: auto;
+    max-height: 240px;
+  }
+
+  /* Chart-local header with range picker */
+  .chart-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--space-4);
+    flex-wrap: wrap;
+  }
+  .chart-head__titles {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    flex: 1 1 240px;
+  }
+  .chart-range-tabs {
+    display: inline-flex;
+    background: rgba(255,255,255,0.7);
+    border: 1px solid rgba(255,255,255,0.7);
+    border-radius: 999px;
+    padding: 3px;
+    gap: 2px;
+    align-self: flex-start;
+  }
+  .chart-range-tab {
+    appearance: none;
+    border: 0;
+    background: transparent;
+    padding: 5px 12px;
+    border-radius: 999px;
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 160ms ease;
+  }
+  .chart-range-tab:hover { color: var(--text); background: rgba(255,255,255,0.5); }
+  .chart-range-tab.is-active {
+    background: linear-gradient(135deg, #8b7cf0, #6b5ce7);
+    color: #fff;
+    box-shadow: 0 4px 10px rgba(107,92,231,0.3);
+  }
+  @media (max-width: 640px) {
+    .chart-range-tabs { width: 100%; justify-content: space-between; }
+    .chart-range-tab { flex: 1; text-align: center; }
+  }
+
+  /* ====================================================
+     CrewAI insights — deep, breathing layout
+     ==================================================== */
+  #crewContent {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-6);
+  }
+  .crew-block {
+    background: rgba(255, 255, 255, 0.72);
+    border-radius: var(--radius-2xl);
+    padding: var(--space-6) var(--space-6);
+    box-shadow: var(--inner-top), var(--shadow-md);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+  }
+  .crew-block--reflection {
+    background: linear-gradient(135deg, rgba(139,124,240,0.14), rgba(109,213,237,0.14));
+  }
+  .crew-block--therapist {
+    background: rgba(255,255,255,0.78);
+  }
+  .crew-block--progress {
+    background: linear-gradient(135deg, rgba(16,185,129,0.08), rgba(107,92,231,0.08));
+  }
+  .crew-block__head {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+  }
+  .crew-block__eyebrow {
+    font-family: var(--font-label, var(--font-body));
+    font-size: 0.72rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--accent-purple, #6b5ce7);
+    font-weight: 700;
+  }
+  .crew-block__title {
+    margin: 0;
+    font-family: var(--font-display, var(--font-body));
+    font-size: clamp(1.2rem, 2.4vw, 1.55rem);
+    color: var(--text, #104356);
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    flex-wrap: wrap;
+  }
+  .crew-block__sub {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: var(--body-sm);
+  }
+
+  /* Flowing prose inside blocks — preserves paragraphs */
+  .crew-prose p {
+    margin: 0 0 var(--space-4);
+    font-size: 1rem;
+    line-height: 1.85;
+    color: var(--text, #104356);
+  }
+  .crew-prose p:last-child { margin-bottom: 0; }
+  .crew-block--reflection .crew-prose p {
+    font-size: 1.05rem;
+    line-height: 1.95;
+  }
+
+  /* Verdict chip next to the progress title */
+  .crew-verdict {
+    font-size: 0.8rem;
+    font-weight: 700;
+    padding: 4px 12px;
+    border-radius: 999px;
+    background: rgba(148,163,184,0.2);
+    color: var(--text, #104356);
+  }
+  .crew-verdict--up   { background: rgba(16,185,129,0.18); color: #047857; }
+  .crew-verdict--flat { background: rgba(148,163,184,0.22); color: #475569; }
+  .crew-verdict--down { background: rgba(239,68,68,0.15);   color: #b91c1c; }
+
+  /* Delta chips row */
+  .crew-deltas {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--space-3);
+  }
+  .crew-delta {
+    padding: var(--space-3) var(--space-4);
+    background: rgba(255,255,255,0.6);
+    border-radius: var(--radius-lg);
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    align-items: flex-start;
+  }
+  .crew-delta__label {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    font-weight: 600;
+  }
+  .crew-delta__val {
+    font-size: 1.25rem;
+    font-weight: 800;
+    font-family: var(--font-display, var(--font-body));
+    direction: ltr;
+    unicode-bidi: bidi-override;
+  }
+  .crew-delta--up   .crew-delta__val { color: #047857; }
+  .crew-delta--flat .crew-delta__val { color: #475569; }
+  .crew-delta--down .crew-delta__val { color: #b91c1c; }
+  @media (max-width: 560px) {
+    .crew-deltas { grid-template-columns: 1fr; }
+  }
+
+  /* Three qualitative highlights under progress */
+  .crew-highlights {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: var(--space-3);
+  }
+  .crew-highlight {
+    padding: var(--space-4);
+    border-radius: var(--radius-lg);
+    background: rgba(255,255,255,0.7);
+    border-inline-start: 3px solid rgba(107,92,231,0.3);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+  }
+  .crew-highlight p {
+    margin: 0;
+    font-size: 0.95rem;
+    line-height: 1.7;
+    color: var(--text, #104356);
+  }
+  .crew-highlight__label {
+    font-size: 0.72rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    font-weight: 700;
+  }
+  .crew-highlight--pos    { border-inline-start-color: #10b981; }
+  .crew-highlight--neg    { border-inline-start-color: #f97316; }
+  .crew-highlight--invite { border-inline-start-color: #6b5ce7; }
+
+  @media (max-width: 640px) {
+    .insights-head { flex-direction: column; align-items: stretch; gap: var(--space-4); }
+    .bar-row { grid-template-columns: 110px 1fr auto; }
+  }
 </style>
 
 <script>
-function renderBarRow(label, val, max, container) {
-  const pct = max ? Math.round((val / max) * 100) : 0;
-  const row = document.createElement('div');
-  row.className = 'bar-row';
-  row.innerHTML = `<span class="name">${label}</span><div class="bar"><span style="width:${pct}%"></span></div><span class="value">${val}</span>`;
-  container.appendChild(row);
-}
+(function () {
+  const POL_COLOR = { positive: '#10b981', neutral: '#94a3b8', negative: '#ef4444', mixed: '#f59e0b' };
 
-function drawHourly(hourly) {
-  const canvas = document.getElementById('hourlyChart');
-  const ctx = canvas.getContext('2d');
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  const pad = 30;
-  const w = canvas.width - pad * 2;
-  const h = canvas.height - pad * 2;
-  ctx.strokeStyle = 'rgba(120,120,140,0.3)';
-  ctx.strokeRect(pad, pad, w, h);
-  ctx.fillStyle = '#6b5ce7';
-  ctx.font = '10px sans-serif';
-  for (let hr = 0; hr < 24; hr++) {
-    const v = hourly[hr] || 0;
-    if (!v) continue;
-    const x = pad + (hr / 24) * w;
-    const barHeight = (v / 10) * h;
-    const y = pad + h - barHeight;
-    ctx.fillRect(x, y, Math.max(w / 24 - 2, 4), barHeight);
+  function renderBarRow(label, val, max, container) {
+    const pct = max ? Math.round((val / max) * 100) : 0;
+    const row = document.createElement('div');
+    row.className = 'bar-row';
+    row.innerHTML = `
+      <span class="name">${escapeHtml(label)}</span>
+      <div class="bar"><span style="width:${pct}%"></span></div>
+      <span class="value">${val}</span>
+    `;
+    container.appendChild(row);
   }
-  // hour labels
-  ctx.fillStyle = 'rgba(100,100,120,0.7)';
-  ctx.font = '9px sans-serif';
-  for (let hr = 0; hr <= 24; hr += 6) {
-    const x = pad + (hr / 24) * w;
-    ctx.fillText(`${hr}`, x, canvas.height - 8);
+
+  function renderLangRow(label, val, max, container) {
+    const pct = max ? Math.round((val / max) * 100) : 0;
+    const row = document.createElement('div');
+    row.className = 'lang-row';
+    row.innerHTML = `
+      <span class="name">${escapeHtml(label)}</span>
+      <div class="bar"><span style="width:${pct}%"></span></div>
+      <span class="value">${val}</span>
+    `;
+    container.appendChild(row);
   }
-}
 
-async function loadLive() {
-  const res = await fetch('/api/insights/live', { credentials: 'include' });
-  const { data } = await res.json();
-  const empty = document.getElementById('emptyState');
-  const content = document.getElementById('content');
+  function drawIntensityBuckets(buckets) {
+    const canvas = document.getElementById('hourlyChart');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const pad = { l: 40, r: 20, t: 20, b: 34 };
+    const w = canvas.width - pad.l - pad.r;
+    const h = canvas.height - pad.t - pad.b;
+    const safeBuckets = Array.isArray(buckets) ? buckets.filter(b => b && typeof b === 'object') : [];
+    const n = safeBuckets.length;
 
-  if (!data || !data.segment_count) {
-    empty.hidden = false;
-    content.hidden = true;
-    document.getElementById('summaryLead').textContent = '';
-    return;
+    // ---- Grid ----
+    ctx.strokeStyle = 'rgba(148,163,184,0.2)';
+    ctx.lineWidth = 1;
+    for (let i = 0; i <= 5; i++) {
+      const y = pad.t + (h * i / 5);
+      ctx.beginPath();
+      ctx.moveTo(pad.l, y);
+      ctx.lineTo(pad.l + w, y);
+      ctx.stroke();
+    }
+
+    // ---- Y-axis (0..10) ----
+    ctx.fillStyle = 'rgba(71,85,105,0.95)';
+    ctx.font = '600 11px sans-serif';
+    ctx.textAlign = 'end';
+    for (let i = 0; i <= 5; i++) {
+      const val = 10 - (i * 2);
+      const y = pad.t + (h * i / 5) + 4;
+      ctx.fillText(String(val), pad.l - 8, y);
+    }
+
+    // ---- X-axis baseline (always visible) ----
+    ctx.strokeStyle = 'rgba(71,85,105,0.45)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(pad.l, pad.t + h);
+    ctx.lineTo(pad.l + w, pad.t + h);
+    ctx.stroke();
+
+    // ---- Empty state: no buckets at all ----
+    if (!n) {
+      ctx.fillStyle = 'rgba(71,85,105,0.6)';
+      ctx.font = '600 13px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.direction = 'rtl';
+      ctx.fillText('אין נתונים להצגה בטווח הזה', pad.l + w / 2, pad.t + h / 2);
+      ctx.direction = 'ltr';
+      return;
+    }
+
+    const slot = w / n;
+    const barW = Math.max(slot - 4, 3);
+
+    // Track whether ANY bar was drawn, so we can show a helpful message
+    // when every bucket is empty of intensity even though segments exist.
+    let anyBarDrawn = false;
+    let anyCount = 0;
+
+    for (let i = 0; i < n; i++) {
+      const v = Number(safeBuckets[i].value) || 0;
+      const cnt = Number(safeBuckets[i].count) || 0;
+      anyCount += cnt;
+      const x = pad.l + i * slot + (slot - barW) / 2;
+
+      if (v > 0) {
+        // Full bar scaled by intensity.
+        const bh = (v / 10) * h;
+        const y = pad.t + h - bh;
+        const t = Math.min(1, v / 10);
+        let c1, c2;
+        if (t < 0.4)      { c1 = 'rgba(109,213,237,0.95)'; c2 = 'rgba(107,92,231,0.85)'; }
+        else if (t < 0.7) { c1 = 'rgba(249,115,22,0.85)';  c2 = 'rgba(107,92,231,0.85)'; }
+        else              { c1 = 'rgba(239,68,68,0.95)';   c2 = 'rgba(249,115,22,0.9)';  }
+        const grad = ctx.createLinearGradient(0, y, 0, y + bh);
+        grad.addColorStop(0, c1);
+        grad.addColorStop(1, c2);
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        if (ctx.roundRect) ctx.roundRect(x, y, barW, bh, 4);
+        else ctx.rect(x, y, barW, bh);
+        ctx.fill();
+        anyBarDrawn = true;
+      } else if (cnt > 0) {
+        // Activity existed but intensity was 0 (or missing). Draw a subtle
+        // stub so the user can see that segments DID land on this day —
+        // this is the common "analysis hasn't populated intensity yet" state.
+        const bh = 6;
+        const y = pad.t + h - bh;
+        ctx.fillStyle = 'rgba(148,163,184,0.45)';
+        ctx.beginPath();
+        if (ctx.roundRect) ctx.roundRect(x, y, barW, bh, 3);
+        else ctx.rect(x, y, barW, bh);
+        ctx.fill();
+      }
+    }
+
+    // ---- X-axis labels — always drawn ----
+    ctx.fillStyle = 'rgba(51,65,85,0.95)';
+    ctx.font = '700 12px sans-serif';
+    ctx.textAlign = 'center';
+    const labelStep = n > 24 ? Math.ceil(n / 10) : n > 12 ? 2 : 1;
+    for (let i = 0; i < n; i++) {
+      if (i % labelStep !== 0 && i !== n - 1) continue;
+      const label = safeBuckets[i].label;
+      if (!label) continue;
+      const x = pad.l + i * slot + slot / 2;
+      ctx.fillText(String(label), x, canvas.height - 12);
+    }
+
+    // ---- Helpful message when activity exists but intensity is 0 everywhere ----
+    if (!anyBarDrawn && anyCount > 0) {
+      ctx.fillStyle = 'rgba(71,85,105,0.75)';
+      ctx.font = '600 12px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.direction = 'rtl';
+      ctx.fillText('יש הקלטות בטווח הזה, אך טרם חושבה עוצמה.', pad.l + w / 2, pad.t + h / 2);
+      ctx.direction = 'ltr';
+    } else if (!anyBarDrawn && anyCount === 0) {
+      ctx.fillStyle = 'rgba(71,85,105,0.6)';
+      ctx.font = '600 12px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.direction = 'rtl';
+      ctx.fillText('אין הקלטות בטווח הזה.', pad.l + w / 2, pad.t + h / 2);
+      ctx.direction = 'ltr';
+    }
   }
-  empty.hidden = true;
-  content.hidden = false;
 
-  document.getElementById('summaryLead').textContent =
-    `ניתחנו ${data.segment_count} קטעים וכ־${data.total_words} מילים בשבוע האחרון.`;
-  document.getElementById('segCount').textContent = data.segment_count;
-  document.getElementById('wordCount').textContent = data.total_words;
-  document.getElementById('intensityAvg').textContent = (data.intensity_avg || 0).toFixed(1);
-  document.getElementById('selfCritic').textContent = `${Math.round((data.self_criticism_avg || 0) * 100)}%`;
+  let currentRange = 'week';
+  const RANGE_WORD = { day: 'היום האחרון', week: 'השבוע האחרון', month: 'החודש האחרון', year: 'השנה האחרונה' };
 
-  // Polarity bar
-  const pd = data.polarity_distribution || {};
-  const total = (pd.positive || 0) + (pd.neutral || 0) + (pd.negative || 0) + (pd.mixed || 0) || 1;
-  const bar = document.getElementById('polarityBar');
-  bar.innerHTML = `
-    <div class="self-talk-bar__segment supportive" style="width:${(pd.positive||0)/total*100}%">חיובי ${pd.positive||0}</div>
-    <div class="self-talk-bar__segment neutral" style="width:${(pd.neutral||0)/total*100}%">ניטרלי ${pd.neutral||0}</div>
-    <div class="self-talk-bar__segment critical" style="width:${((pd.negative||0)+(pd.mixed||0))/total*100}%">שלילי ${(pd.negative||0)+(pd.mixed||0)}</div>
-  `;
-  document.getElementById('polaritySummary').textContent =
-    `${pd.positive||0} חיובי · ${pd.neutral||0} ניטרלי · ${pd.negative||0} שלילי · ${pd.mixed||0} מעורב`;
+  // Emotional-tension smiley: low intensity = big smile, high intensity = frown.
+  // Returns an SVG + Hebrew label for display.
+  function tensionVisual(intensity) {
+    const v = Math.max(0, Math.min(10, Number(intensity) || 0));
+    const t = v / 10;  // 0..1
+    // Mouth curve — control-Y interpolates from smile (+20) to frown (-6).
+    const controlY = 20 - t * 26;
+    // Face color transitions green → teal → grey → orange → red
+    let color;
+    let label;
+    if (v < 2)      { color = '#10b981'; label = 'רגוע'; }
+    else if (v < 4) { color = '#6dd5ed'; label = 'מאוזן'; }
+    else if (v < 6) { color = '#94a3b8'; label = 'מעט מתוח'; }
+    else if (v < 8) { color = '#f97316'; label = 'מתוח'; }
+    else            { color = '#ef4444'; label = 'מתוח מאוד'; }
+    const svg = `
+      <svg viewBox="-32 -32 64 64" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="0" cy="0" r="28" fill="${color}" fill-opacity="0.14"/>
+        <circle cx="0" cy="0" r="28" fill="none" stroke="${color}" stroke-width="2.5"/>
+        <circle cx="-9" cy="-6" r="2.5" fill="#104356"/>
+        <circle cx="9"  cy="-6" r="2.5" fill="#104356"/>
+        <path d="M -11 6 Q 0 ${controlY.toFixed(1)} 11 6"
+              stroke="#104356" stroke-width="2.8" fill="none" stroke-linecap="round"/>
+      </svg>
+    `;
+    return { svg, label };
+  }
 
-  // Languages
-  document.getElementById('langs').innerHTML = (data.languages || []).map(([l, n]) =>
-    `<div>${l === 'he' ? '🇮🇱 עברית' : l === 'en' ? '🇬🇧 English' : l}: <strong>${n}</strong></div>`
-  ).join('') || 'אין';
+  async function loadLive() {
+    const res = await fetch(`/api/insights/live?range=${currentRange}`, { credentials: 'include' });
+    const { data } = await res.json();
+    const empty = document.getElementById('emptyState');
+    const content = document.getElementById('content');
 
-  // Triggers
-  const tr = document.getElementById('triggers');
-  tr.innerHTML = (data.triggers || []).slice(0, 5).map(t =>
-    `<li><strong>${t.topic || '—'}</strong>: ${t.desc || ''} <small>(${new Date(t.when).toLocaleString('he-IL')})</small></li>`
-  ).join('') || '<li>אין טריגרים השבוע 🌱</li>';
+    if (!data || !data.segment_count) {
+      empty.hidden = false;
+      content.hidden = true;
+      document.getElementById('summaryLead').textContent = '';
+      return;
+    }
+    empty.hidden = true;
+    content.hidden = false;
 
-  // Calming
-  const cm = document.getElementById('calming');
-  cm.innerHTML = (data.calming || []).slice(0, 5).map(c =>
-    `<li><strong>${c.topic || '—'}</strong>: ${c.desc || ''}</li>`
-  ).join('') || '<li>טרם זוהו רגעי הרגעה</li>';
+    document.getElementById('summaryLead').textContent =
+      `ניתחנו ${data.segment_count} קטעים וכ־${data.total_words} מילים ב${RANGE_WORD[currentRange]}.`;
+    document.getElementById('segCount').textContent = data.segment_count;
+    document.getElementById('wordCount').textContent = data.total_words;
+    const intensityVal = Number(data.intensity_avg || 0);
+    document.getElementById('intensityAvg').textContent = intensityVal.toFixed(1);
+    const tension = tensionVisual(intensityVal);
+    document.getElementById('intensitySmiley').innerHTML = tension.svg;
+    document.getElementById('intensityLabel').textContent = `${tension.label} · מתוך 10`;
 
-  // Topics
-  const tc = document.getElementById('topics');
-  tc.innerHTML = '';
-  const topicMax = Math.max(1, ...(data.top_topics || []).map(([_, n]) => n));
-  (data.top_topics || []).forEach(([name, n]) => renderBarRow(name, n, topicMax, tc));
+    // Duration card — auto-switch between minutes and hours
+    const durSec = data.total_duration_sec || 0;
+    const durEl = document.getElementById('totalDuration');
+    const durUnit = document.getElementById('totalDurationUnit');
+    if (durSec >= 3600) {
+      const hrs = Math.floor(durSec / 3600);
+      const mins = Math.round((durSec % 3600) / 60);
+      durEl.textContent = `${hrs}:${String(mins).padStart(2, '0')}`;
+      durUnit.textContent = 'שעות:דקות';
+    } else if (durSec >= 60) {
+      durEl.textContent = Math.round(durSec / 60);
+      durUnit.textContent = 'דקות';
+    } else {
+      durEl.textContent = Math.round(durSec);
+      durUnit.textContent = 'שניות';
+    }
 
-  // Cognitive patterns
-  const cg = document.getElementById('cogPatterns');
-  cg.innerHTML = '';
-  const patMax = Math.max(1, ...(data.cognitive_patterns || []).map(([_, n]) => n));
-  if (!data.cognitive_patterns?.length) {
-    cg.innerHTML = '<p class="text-muted">לא זוהו דפוסים קוגניטיביים חוזרים 👏</p>';
-  } else {
-    const labelMap = {
+    // Polarity distribution
+    const pd = data.polarity_distribution || {};
+    const pos = pd.positive || 0, neu = pd.neutral || 0, neg = pd.negative || 0, mix = pd.mixed || 0;
+    const total = Math.max(1, pos + neu + neg + mix);
+
+    // Detailed split from backend — MUST be defined before the bar & chips render.
+    const pdd = data.polarity_detailed || {};
+    const posStrong = pdd.strong_positive ?? 0;
+    const posMild   = pdd.positive        ?? pos;
+    const negStrong = pdd.strong_negative ?? 0;
+    const negMild   = pdd.negative        ?? neg;
+
+    // Big hero mood gauge
+    const mood = window.MARAMARA.moodScoreFromPolarity(pd);
+    window.MARAMARA.renderMoodGauge(
+      document.getElementById('moodGauge'),
+      mood,
+      { size: 460, subtitle: `${total} קטעים ב${RANGE_WORD[currentRange]}` }
+    );
+
+    // Stack bar — same 5 zones as the chips & gauge, same order (real data).
+    const bar = document.getElementById('polarityBar');
+    const neuCombined = neu + mix;
+    bar.innerHTML = `
+      ${slice('pos-strong', posStrong, total, 'חיובי חזק')}
+      ${slice('pos-mild',   posMild,   total, 'חיובי מתון')}
+      ${slice('neu',        neuCombined, total, 'ניטרלי')}
+      ${slice('neg-mild',   negMild,   total, 'שלילי')}
+      ${slice('neg-strong', negStrong, total, 'שלילי חזק')}
+    `;
+    const chip = (sw, name, n) => {
+      const pct = total ? Math.round((n / total) * 100) : 0;
+      return `
+        <div class="polarity-chip">
+          <span class="polarity-chip__dot" style="background:${sw}"></span>
+          <span class="polarity-chip__name">${name}</span>
+          <span class="polarity-chip__pct">${pct}%</span>
+          <span class="polarity-chip__count">${n} קטעים</span>
+        </div>
+      `;
+    };
+    const chipsEl = document.getElementById('polarityChips');
+    if (chipsEl) {
+      chipsEl.innerHTML =
+        chip('#10b981', 'חיובי חזק', posStrong) +
+        chip('#6dd5ed', 'חיובי מתון', posMild) +
+        chip('#94a3b8', 'ניטרלי',    neu + mix) +
+        chip('#f97316', 'שלילי',     negMild) +
+        chip('#ef4444', 'שלילי חזק', negStrong);
+    }
+    document.getElementById('polaritySummary').textContent =
+      `על פני ${total} קטעים: ${Math.round((posStrong+posMild)/total*100)}% חיוביים, ${Math.round((neu+mix)/total*100)}% ניטרליים, ${Math.round((negStrong+negMild)/total*100)}% שליליים.`;
+
+    // Languages (as bars)
+    const langs = data.languages || [];
+    const langEl = document.getElementById('langs');
+    langEl.innerHTML = '';
+    const langMax = Math.max(1, ...langs.map(([, n]) => n));
+    const langLabel = { he: 'עברית', en: 'English' };
+    for (const [code, n] of langs) renderLangRow(langLabel[code] || code, n, langMax, langEl);
+    if (!langs.length) langEl.innerHTML = '<p class="insights-section__hint">אין</p>';
+
+    // Triggers — Hebrew topic label
+    const tr = document.getElementById('triggers');
+    const topicT = (x) => (window.MARAMARA?.topicLabel?.(x)) || x || '—';
+    tr.innerHTML = (data.triggers || []).slice(0, 5).map(t =>
+      `<li><strong>${escapeHtml(topicT(t.topic))}</strong>${t.desc ? escapeHtml(t.desc) : ''}<small>${new Date(t.when).toLocaleString('he-IL')}</small></li>`
+    ).join('') || '<li>אין טריגרים השבוע.</li>';
+
+    // Calming — Hebrew topic label
+    const cm = document.getElementById('calming');
+    cm.innerHTML = (data.calming || []).slice(0, 5).map(c =>
+      `<li><strong>${escapeHtml(topicT(c.topic))}</strong>${c.desc ? escapeHtml(c.desc) : ''}</li>`
+    ).join('') || '<li>טרם זוהו רגעי הרגעה.</li>';
+
+    // Topics — translate to Hebrew via shared MARAMARA.topicLabel when mapping exists.
+    const tc = document.getElementById('topics');
+    tc.innerHTML = '';
+    const topicMax = Math.max(1, ...(data.top_topics || []).map(([, n]) => n));
+    (data.top_topics || []).forEach(([name, n]) =>
+      renderBarRow((window.MARAMARA?.topicLabel?.(name)) || name, n, topicMax, tc)
+    );
+    if (!data.top_topics?.length) tc.innerHTML = '<p class="insights-section__hint">אין נושאים עדיין.</p>';
+
+    // Cognitive patterns
+    const cg = document.getElementById('cogPatterns');
+    cg.innerHTML = '';
+    const patMap = {
       catastrophizing: 'קטסטרופיזציה', all_or_nothing: 'הכל או כלום',
       personalization: 'האשמה עצמית', should_statements: '"צריך"',
-      mind_reading: 'קריאת מחשבות', filtering: 'סינון שלילי'
+      mind_reading: 'קריאת מחשבות', filtering: 'סינון שלילי',
     };
-    data.cognitive_patterns.forEach(([name, n]) =>
-      renderBarRow(labelMap[name] || name, n, patMax, cg)
-    );
-  }
-
-  // Tags
-  document.getElementById('tags').innerHTML = (data.top_tags || []).map(([t, n]) =>
-    `<span class="chip">${t} · ${n}</span>`
-  ).join('') || '<span class="text-muted">אין</span>';
-
-  drawHourly(data.hourly_intensity || {});
-}
-
-async function loadCrew() {
-  const res = await fetch('/api/insights/weekly', { credentials: 'include' });
-  const { data } = await res.json();
-  if (!data || !data.crewai_insights) return;
-  const box = document.getElementById('crewBox');
-  const body = document.getElementById('crewContent');
-  box.hidden = false;
-  const ci = data.crewai_insights;
-  body.innerHTML = `
-    ${ci.user_reflection ? `<p><strong>השתקפות:</strong> ${ci.user_reflection}</p>` : ''}
-    ${ci.therapist_summary ? `<p><strong>סיכום למטפל:</strong> ${ci.therapist_summary}</p>` : ''}
-    ${ci.progress ? `<p><strong>התקדמות:</strong> ${ci.progress.verdict} — ${ci.progress.explanation || ''}</p>` : ''}
-  `;
-}
-
-document.getElementById('genWeekly').addEventListener('click', async (e) => {
-  const btn = e.target;
-  btn.disabled = true;
-  btn.textContent = 'מעבד... (30-90 שניות)';
-  try {
-    const res = await fetch('/api/insights/generate-weekly', { method: 'POST', credentials: 'include' });
-    const body = await res.json();
-    if (body.success) {
-      btn.textContent = 'התובנות מוכנות!';
-      setTimeout(() => { loadCrew(); btn.textContent = 'רענן תובנות AI'; btn.disabled = false; }, 3000);
+    const patterns = data.cognitive_patterns || [];
+    const patMax = Math.max(1, ...patterns.map(([, n]) => n));
+    if (!patterns.length) {
+      cg.innerHTML = '<p class="insights-section__hint">לא זוהו דפוסים חוזרים.</p>';
     } else {
-      btn.textContent = 'שגיאה - נסה שוב';
-      btn.disabled = false;
+      patterns.forEach(([name, n]) => renderBarRow(patMap[name] || name, n, patMax, cg));
     }
-  } catch (err) {
-    btn.textContent = 'שגיאה';
-    btn.disabled = false;
-  }
-});
 
-loadLive();
-loadCrew();
-setInterval(loadLive, 20000);
+    // Tags
+    document.getElementById('tags').innerHTML = (data.top_tags || []).map(([t, n]) =>
+      `<span class="chip">${escapeHtml(t)}<small>×${n}</small></span>`
+    ).join('') || '<span class="insights-section__hint">אין</span>';
+
+    // Range-aware intensity chart.
+    // Prefer the range-aware intensity_buckets. If the backend returned
+    // none (or an empty array) but hourly_intensity is populated, fall
+    // back to showing that — better to see SOMETHING than a blank chart.
+    let buckets = Array.isArray(data.intensity_buckets) ? data.intensity_buckets : [];
+    if (!buckets.length && data.hourly_intensity && Object.keys(data.hourly_intensity).length) {
+      buckets = Array.from({ length: 24 }, (_, h) => ({
+        label: String(h).padStart(2, '0'),
+        value: Number(data.hourly_intensity[h] || data.hourly_intensity[String(h)] || 0),
+        count: (data.hourly_intensity[h] || data.hourly_intensity[String(h)]) ? 1 : 0,
+      }));
+    }
+    drawIntensityBuckets(buckets);
+    const chartTitle = {
+      day:   'עוצמה לפי שעה (היום)',
+      week:  'עוצמה לפי יום (שבוע אחרון)',
+      month: 'עוצמה לפי יום (30 יום)',
+      year:  'עוצמה לפי חודש (שנה אחרונה)',
+    }[currentRange] || 'עוצמה לפי זמן';
+    const chartSub = {
+      day:   'עוצמה ממוצעת בכל שעה של היום.',
+      week:  'עוצמה ממוצעת בכל יום של השבוע האחרון.',
+      month: 'עוצמה ממוצעת לכל יום ב־30 יום האחרונים.',
+      year:  'עוצמה ממוצעת לכל חודש בשנה האחרונה.',
+    }[currentRange] || '';
+    document.getElementById('intensityChartTitle').textContent = chartTitle;
+    document.getElementById('intensityChartSub').textContent = chartSub;
+  }
+
+  function slice(kind, n, total, name) {
+    if (!n) return '';
+    const pct = (n / total) * 100;
+    const pctRounded = Math.round(pct);
+    const label = pct >= 10 ? `${name} · ${pctRounded}%` : (pct >= 4 ? `${pctRounded}%` : '');
+    const title = `${name}: ${pctRounded}% (${n} קטעים)`;
+    return `<div class="stack-bar__slice stack-bar__slice--${kind}" style="width:${pct}%" title="${title}">${label}</div>`;
+  }
+
+  // Split a long string into paragraphs. Accepts \n\n, single \n, or a single paragraph.
+  function paragraphize(text) {
+    const raw = String(text ?? '').trim();
+    if (!raw) return [];
+    // Prefer double-newline; fall back to single-newline if none exist.
+    const parts = raw.includes('\n\n') ? raw.split(/\n\s*\n/) : raw.split(/\n+/);
+    return parts.map(p => p.trim()).filter(Boolean);
+  }
+
+  function renderProse(text) {
+    return paragraphize(text).map(p => `<p>${escapeHtml(p)}</p>`).join('');
+  }
+
+  const VERDICT_HE = { improving: 'בשיפור', stable: 'יציב', regressing: 'נסיגה קלה' };
+  const VERDICT_CLASS = { improving: 'crew-verdict--up', stable: 'crew-verdict--flat', regressing: 'crew-verdict--down' };
+
+  function renderDeltaChip(label, delta) {
+    if (delta === null || delta === undefined || Number.isNaN(Number(delta))) return '';
+    const d = Number(delta);
+    const sign = d > 0 ? '+' : '';
+    // For negativity / self_criticism / intensity, a NEGATIVE delta is an improvement.
+    const improving = d < 0;
+    const cls = d === 0 ? 'crew-delta--flat' : (improving ? 'crew-delta--up' : 'crew-delta--down');
+    return `
+      <div class="crew-delta ${cls}">
+        <span class="crew-delta__label">${label}</span>
+        <span class="crew-delta__val">${sign}${d.toFixed(2)}</span>
+      </div>
+    `;
+  }
+
+  async function loadCrew() {
+    const res = await fetch('/api/insights/weekly', { credentials: 'include' });
+    const { data } = await res.json();
+    if (!data || !data.crewai_insights) return;
+    const box = document.getElementById('crewBox');
+    const body = document.getElementById('crewContent');
+    box.hidden = false;
+    const ci = data.crewai_insights;
+    const prog = ci.progress || null;
+
+    const reflectionHtml = ci.user_reflection ? `
+      <article class="crew-block crew-block--reflection">
+        <header class="crew-block__head">
+          <span class="crew-block__eyebrow">מילים אליך</span>
+          <h3 class="crew-block__title">השתקפות אישית</h3>
+          <p class="crew-block__sub">כך שמענו אותך השבוע — בקצב שלך, במילים שלך.</p>
+        </header>
+        <div class="crew-prose">${renderProse(ci.user_reflection)}</div>
+      </article>
+    ` : '';
+
+    const therapistHtml = ci.therapist_summary ? `
+      <article class="crew-block crew-block--therapist">
+        <header class="crew-block__head">
+          <span class="crew-block__eyebrow">למטפל / למאמנ/ת</span>
+          <h3 class="crew-block__title">סיכום קליני</h3>
+          <p class="crew-block__sub">תמונת שבוע, דפוסים, אלמנטים מחזקים והמלצות להתערבות.</p>
+        </header>
+        <div class="crew-prose">${renderProse(ci.therapist_summary)}</div>
+      </article>
+    ` : '';
+
+    const progressHtml = prog ? `
+      <article class="crew-block crew-block--progress">
+        <header class="crew-block__head">
+          <span class="crew-block__eyebrow">מגמה שבועית</span>
+          <h3 class="crew-block__title">
+            התקדמות
+            <span class="crew-verdict ${VERDICT_CLASS[prog.verdict] || ''}">${escapeHtml(VERDICT_HE[prog.verdict] || prog.verdict || '—')}</span>
+          </h3>
+        </header>
+        ${prog.explanation ? `<div class="crew-prose">${renderProse(prog.explanation)}</div>` : ''}
+        <div class="crew-deltas">
+          ${renderDeltaChip('שליליות', prog.negativity_delta)}
+          ${renderDeltaChip('עוצמה', prog.intensity_delta)}
+          ${renderDeltaChip('ביקורת עצמית', prog.self_criticism_delta)}
+        </div>
+        <div class="crew-highlights">
+          ${prog.key_strength ? `<div class="crew-highlight crew-highlight--pos"><span class="crew-highlight__label">חוזק השבוע</span><p>${escapeHtml(prog.key_strength)}</p></div>` : ''}
+          ${prog.key_challenge ? `<div class="crew-highlight crew-highlight--neg"><span class="crew-highlight__label">אתגר מרכזי</span><p>${escapeHtml(prog.key_challenge)}</p></div>` : ''}
+          ${prog.micro_invitation ? `<div class="crew-highlight crew-highlight--invite"><span class="crew-highlight__label">הזמנה עדינה לשבוע הקרוב</span><p>${escapeHtml(prog.micro_invitation)}</p></div>` : ''}
+        </div>
+      </article>
+    ` : '';
+
+    body.innerHTML = reflectionHtml + progressHtml + therapistHtml;
+  }
+
+  const genBtn = document.getElementById('genWeekly');
+  genBtn.addEventListener('click', async () => {
+    genBtn.disabled = true;
+    genBtn.textContent = 'מעבד… (30–90 שניות)';
+    try {
+      const res = await fetch('/api/insights/generate-weekly', { method: 'POST', credentials: 'include' });
+      const body = await res.json();
+      if (body.success) {
+        genBtn.textContent = 'התובנות מוכנות';
+        setTimeout(() => { loadCrew(); genBtn.textContent = 'רענן תובנות AI'; genBtn.disabled = false; }, 3000);
+      } else {
+        genBtn.textContent = 'שגיאה — נסה שוב';
+        genBtn.disabled = false;
+      }
+    } catch (_) {
+      genBtn.textContent = 'שגיאה';
+      genBtn.disabled = false;
+    }
+  });
+
+  function escapeHtml(s) {
+    return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  // Range selection — two mirror groups:
+  //   1) `.range-tab`  (top of page, covers everything)
+  //   2) `.chart-range-tab` (inside the intensity chart card, quick access)
+  // Clicking either updates BOTH groups' active state and reloads the data.
+  function applyRange(range) {
+    if (!range || range === currentRange) return;
+    currentRange = range;
+    document.querySelectorAll('.range-tab').forEach(b => {
+      b.classList.toggle('is-active', b.dataset.range === range);
+    });
+    document.querySelectorAll('.chart-range-tab').forEach(b => {
+      b.classList.toggle('is-active', b.dataset.chartRange === range);
+    });
+    loadLive();
+  }
+
+  document.querySelectorAll('.range-tab').forEach(btn => {
+    btn.addEventListener('click', () => applyRange(btn.dataset.range));
+  });
+  document.querySelectorAll('.chart-range-tab').forEach(btn => {
+    btn.addEventListener('click', () => applyRange(btn.dataset.chartRange));
+  });
+
+  // Share button — tries Web Share API, falls back to downloading the PDF.
+  document.getElementById('shareBtn')?.addEventListener('click', async (e) => {
+    const btn = e.currentTarget;
+    const orig = btn.textContent;
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: 'התובנות שלי — MARAMARA',
+          text: 'הנה הדוח האישי שלי מ־MARAMARA',
+          url: window.location.origin + '/dashboard/insights',
+        });
+        return;
+      }
+      // Fallback: trigger PDF download
+      btn.disabled = true;
+      btn.textContent = 'מכין דוח PDF...';
+      const res = await fetch('/dashboard/api/export/pdf', { credentials: 'include' });
+      if (!res.ok) throw new Error('שגיאה ביצוא');
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `maramara-insights-${new Date().toISOString().slice(0,10)}.pdf`;
+      document.body.appendChild(a); a.click(); a.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      if (err.name !== 'AbortError') alert('שגיאה: ' + err.message);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = orig;
+    }
+  });
+
+  const intervalId = setInterval(loadLive, 20000);
+  function cleanup() {
+    clearInterval(intervalId);
+    window.removeEventListener('maramara:navigated', cleanup);
+  }
+  window.addEventListener('maramara:navigated', cleanup);
+
+  loadLive();
+  loadCrew();
+})();
 </script>
 {% endblock %}

@@ -14,8 +14,8 @@ def _llm() -> ChatAnthropic:
     return ChatAnthropic(
         model=s.crewai_model,
         api_key=s.anthropic_api_key,
-        temperature=0.3,
-        max_tokens=2048,
+        temperature=0.4,
+        max_tokens=4096,
     )
 
 
@@ -120,10 +120,12 @@ def progress_agent() -> Agent:
 def therapist_summary_agent() -> Agent:
     return Agent(
         role="Therapist Summary Writer",
-        goal="Write a clinical-grade paragraph summary addressed to the therapist.",
+        goal="Write a detailed clinical-grade summary addressed to the therapist, ~500-650 words, with four structured sections.",
         backstory=(
-            "A clinical documentation specialist. You synthesize other agents' findings into "
-            "a 200-300 word summary appropriate for a licensed therapist's review."
+            "A clinical documentation specialist with ten years of case-note writing. "
+            "You synthesize other agents' findings into a long, substantive review — never shorthand. "
+            "You cite specific data (times, counts, deltas) and reference concrete moments from the week, "
+            "not generalities. Your reports are what the therapist actually opens before a session."
         ),
         llm=_llm(),
         allow_delegation=False,
@@ -134,11 +136,14 @@ def therapist_summary_agent() -> Agent:
 def user_reflection_agent() -> Agent:
     return Agent(
         role="User Reflection Writer",
-        goal="Write a short, compassionate, non-judgmental reflection for the user.",
+        goal="Write a deeply personal, specific, compassionate reflection for the user — 500-650 Hebrew words, 5-7 paragraphs, separated by blank lines.",
         backstory=(
-            "An empathic coach. You translate analytical findings into gentle reflective "
-            "sentences that the user can read without feeling shamed. Never use words like 'toxic' "
-            "or 'bad'. Use phrasing like 'You tended to... during...'."
+            "An empathic coach and therapeutic writer. Your single mission: the user must feel TRULY SEEN "
+            "when they read what you wrote. You never produce short, generic, greeting-card output. "
+            "You always quote at least 2-3 of their own phrases back to them, name the exact feelings you "
+            "heard, acknowledge the effort alongside the struggle, and close with warmth. "
+            "Forbidden words: 'toxic', 'bad', 'problematic', 'you always'. "
+            "Preferred phrasing: 'שמעתי אותך אומר...', 'נראה שב...', 'נצפה ש...'. Second-person, gentle, specific."
         ),
         llm=_llm(),
         allow_delegation=False,

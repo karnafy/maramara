@@ -2,86 +2,216 @@
 {% block title %}ציר זמן — MARAMARA{% endblock %}
 
 {% block content %}
-<section class="dashboard">
-  <header class="dashboard__header">
-    <h1>ציר הזמן הרגשי שלך</h1>
-    <div class="dashboard__controls">
-      <input type="date" id="dateInput" class="form__input" />
+<section class="timeline-page">
+  <header class="timeline-head">
+    <div>
+      <h1>ציר הזמן הרגשי שלך</h1>
+      <p class="timeline-head__sub" id="tlSummary">טוען…</p>
     </div>
+    <a class="btn btn--ghost btn--sm" href="/dashboard/api/export" download>ייצוא CSV</a>
   </header>
 
-  <div class="timeline-container">
-    <canvas id="timelineChart" width="900" height="320" aria-label="Emotional timeline"></canvas>
+  <div class="range-tabs range-tabs--wide" role="tablist">
+    <button class="range-tab" data-range="hour" type="button">שעתי</button>
+    <button class="range-tab range-tab--active" data-range="day" type="button">יומי</button>
+    <button class="range-tab" data-range="week" type="button">שבועי</button>
+    <button class="range-tab" data-range="month" type="button">חודשי</button>
+    <button class="range-tab" data-range="year" type="button">שנתי</button>
   </div>
 
-  <section class="timeline-legend">
-    <div><span class="dot dot--positive"></span> חיובי</div>
-    <div><span class="dot dot--neutral"></span> ניטרלי</div>
-    <div><span class="dot dot--negative"></span> שלילי</div>
-    <div><span class="dot dot--trigger"></span> טריגר</div>
-    <div><span class="dot dot--calming"></span> הרגעה</div>
+  <section class="timeline-panel">
+    <canvas id="timelineChart" aria-label="Emotional timeline"></canvas>
+    <div class="timeline-legend">
+      <span><span class="swatch" style="background:#10b981"></span>חיובי</span>
+      <span><span class="swatch" style="background:#94a3b8"></span>ניטרלי</span>
+      <span><span class="swatch" style="background:#ef4444"></span>שלילי</span>
+    </div>
   </section>
 </section>
 
+<style>
+  .timeline-page {
+    max-width: 960px;
+    margin-inline: auto;
+    padding: var(--space-6) var(--space-5);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-6);
+  }
+  .timeline-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    gap: var(--space-4);
+    flex-wrap: wrap;
+  }
+  .timeline-head h1 {
+    margin: 0 0 var(--space-2);
+    font-family: var(--font-display, var(--font-body));
+    font-size: clamp(1.6rem, 4vw, 2.2rem);
+  }
+  .timeline-head__sub { margin: 0; color: var(--text-muted); font-size: var(--body-md); }
+
+  .range-tabs--wide { align-self: flex-start; }
+
+  .timeline-panel {
+    background: rgba(255, 255, 255, 0.78);
+    border: 1px solid rgba(255, 255, 255, 0.6);
+    border-radius: var(--radius-2xl);
+    padding: var(--space-6) var(--space-5);
+    box-shadow: var(--inner-top), var(--shadow-md);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+  }
+  #timelineChart {
+    width: 100%;
+    height: auto;
+    aspect-ratio: 16 / 6;
+    max-height: 360px;
+  }
+  .timeline-legend {
+    display: flex;
+    gap: var(--space-5);
+    justify-content: center;
+    font-size: var(--label-md, 0.85rem);
+    color: var(--text-muted);
+  }
+  .timeline-legend .swatch {
+    display: inline-block;
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    margin-inline-end: 6px;
+    vertical-align: middle;
+  }
+</style>
+
 <script>
 (function () {
-const dateInput = document.getElementById('dateInput');
-if (!dateInput) return;
-dateInput.value = new Date().toISOString().slice(0, 10);
-
-async function loadTimeline(date) {
-  const res = await fetch(`/dashboard/api/timeline?date=${date}`, { credentials: 'include' });
-  const { data } = await res.json();
-  drawTimeline(data || []);
-}
-
-function drawTimeline(segments) {
+  let currentRange = 'day';
   const canvas = document.getElementById('timelineChart');
+  const summary = document.getElementById('tlSummary');
   const ctx = canvas.getContext('2d');
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  const padding = 40;
-  const w = canvas.width - padding * 2;
-  const h = canvas.height - padding * 2;
-  ctx.strokeStyle = '#cbd5e1';
-  ctx.strokeRect(padding, padding, w, h);
 
-  if (!segments.length) {
-    ctx.fillStyle = '#94a3b8';
-    ctx.font = '14px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText('אין נתונים לתאריך הנבחר', canvas.width / 2, canvas.height / 2);
-    return;
+  function pickColor(row) {
+    const pos = row.positive_count || 0;
+    const neg = row.negative_count || 0;
+    if (neg > pos)      return { fill: '#ef4444', tint: 'rgba(239,68,68,0.2)' };
+    if (pos > neg)      return { fill: '#10b981', tint: 'rgba(16,185,129,0.2)' };
+    return { fill: '#94a3b8', tint: 'rgba(148,163,184,0.2)' };
   }
 
-  const colorMap = { positive: '#10b981', neutral: '#64748b', negative: '#ef4444', mixed: '#f59e0b' };
+  function resizeCanvas() {
+    const dpr = window.devicePixelRatio || 1;
+    const w = canvas.clientWidth;
+    const h = canvas.clientHeight;
+    canvas.width  = Math.round(w * dpr);
+    canvas.height = Math.round(h * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
 
-  segments.forEach(s => {
-    const hour = new Date(s.created_at).getHours() + new Date(s.created_at).getMinutes() / 60;
-    const x = padding + (hour / 24) * w;
-    const y = padding + h - (s.intensity_score / 10) * h;
-    ctx.fillStyle = colorMap[s.polarity] || '#64748b';
-    ctx.beginPath();
-    ctx.arc(x, y, 5, 0, Math.PI * 2);
-    ctx.fill();
-    if (s.trigger_detected) {
-      ctx.strokeStyle = '#ef4444';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.arc(x, y, 9, 0, Math.PI * 2);
-      ctx.stroke();
+  function draw(series, range) {
+    resizeCanvas();
+    const W = canvas.clientWidth;
+    const H = canvas.clientHeight;
+    ctx.clearRect(0, 0, W, H);
+
+    if (!series.length) {
+      ctx.fillStyle = '#94a3b8';
+      ctx.font = '14px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('אין עדיין נתונים לטווח הזה', W / 2, H / 2);
+      return;
     }
-    if (s.calming_detected) {
-      ctx.strokeStyle = '#10b981';
-      ctx.lineWidth = 2;
+
+    const pad = { l: 40, r: 20, t: 20, b: 40 };
+    const innerW = W - pad.l - pad.r;
+    const innerH = H - pad.t - pad.b;
+
+    // Grid lines + Y labels (0..10)
+    ctx.strokeStyle = 'rgba(148,163,184,0.18)';
+    ctx.fillStyle = 'rgba(100,116,139,0.8)';
+    ctx.font = '11px sans-serif';
+    ctx.textAlign = 'end';
+    for (let i = 0; i <= 5; i++) {
+      const y = pad.t + (innerH * i / 5);
       ctx.beginPath();
-      ctx.arc(x, y, 9, 0, Math.PI * 2);
+      ctx.moveTo(pad.l, y);
+      ctx.lineTo(pad.l + innerW, y);
       ctx.stroke();
+      ctx.fillText(String(10 - i * 2), pad.l - 8, y + 4);
     }
+
+    const n = series.length;
+    const slot = innerW / n;
+    const barW = Math.max(4, Math.min(28, slot * 0.55));
+
+    // Draw bars
+    series.forEach((row, i) => {
+      const v = row.intensity_avg || 0;
+      const bh = (v / 10) * innerH;
+      const x = pad.l + i * slot + (slot - barW) / 2;
+      const y = pad.t + innerH - bh;
+      const { fill, tint } = pickColor(row);
+      // tint base
+      ctx.fillStyle = tint;
+      ctx.fillRect(x, pad.t, barW, innerH);
+      // bar
+      ctx.fillStyle = fill;
+      if (ctx.roundRect) { ctx.beginPath(); ctx.roundRect(x, y, barW, Math.max(0, bh), 4); ctx.fill(); }
+      else ctx.fillRect(x, y, barW, Math.max(0, bh));
+    });
+
+    // X labels
+    ctx.fillStyle = 'rgba(100,116,139,0.9)';
+    ctx.textAlign = 'center';
+    series.forEach((row, i) => {
+      if (!row.label) return;
+      const x = pad.l + i * slot + slot / 2;
+      ctx.fillText(row.label, x, H - 14);
+    });
+
+    // Range label
+    ctx.textAlign = 'start';
+    ctx.fillStyle = 'rgba(100,116,139,0.5)';
+    ctx.font = '10px sans-serif';
+    const rangeLabel = {
+      hour: 'שעה אחרונה (קפיצות של 5 דקות)',
+      day:  'היום (24 שעות)',
+      week: '7 ימים אחרונים',
+      month: '30 ימים אחרונים',
+      year: '12 חודשים אחרונים',
+    }[range] || '';
+    ctx.fillText(rangeLabel, pad.l, H - 2);
+  }
+
+  async function load() {
+    summary.textContent = 'טוען…';
+    try {
+      const res = await fetch(`/dashboard/api/timeline?range=${currentRange}`, { credentials: 'include' });
+      const body = await res.json();
+      const series = body?.data?.series || [];
+      const totalSegs = series.reduce((s, r) => s + (r.positive_count || 0) + (r.negative_count || 0), 0);
+      summary.textContent = totalSegs
+        ? `${totalSegs} קטעים בטווח הזה`
+        : 'אין עדיין נתונים לטווח הזה';
+      draw(series, currentRange);
+    } catch (e) {
+      summary.textContent = 'שגיאה בטעינת הנתונים';
+    }
+  }
+
+  document.querySelectorAll('.range-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.range-tab').forEach(t => t.classList.remove('range-tab--active'));
+      tab.classList.add('range-tab--active');
+      currentRange = tab.dataset.range;
+      load();
+    });
   });
-}
 
-dateInput.addEventListener('change', () => loadTimeline(dateInput.value));
-loadTimeline(dateInput.value);
+  window.addEventListener('resize', () => load());
+  load();
 })();
 </script>
 {% endblock %}

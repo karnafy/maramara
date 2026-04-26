@@ -90,7 +90,7 @@ maramara/
 
 | Layer | Choice |
 |-------|--------|
-| Backend | **Flask 3** + Python 3.11 (conda env: **KARNAF**) |
+| Backend | **Flask 3** + Python 3.12 (conda env: **IVRIT**) |
 | Validation | **Pydantic v2** + pydantic-settings |
 | Auth | **Supabase Auth** (JWT) via PyJWT |
 | Queue | **RQ** + Redis |
@@ -199,7 +199,7 @@ See `.env.example` for the full list. Must-haves:
 
 ```bash
 # 1. Install deps
-conda activate KARNAF
+conda activate IVRIT
 pip install -r api/requirements.txt
 
 # 2. Redis

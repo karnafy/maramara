@@ -1,0 +1,186 @@
+{% extends 'base.html' %}
+{% block title %}חיבור למטפל — MARAMARA{% endblock %}
+
+{% block content %}
+<section class="connect-page">
+  <div class="connect-card">
+    <div class="connect-card__brand">MARAMARA · קישור מטפל-מטופל</div>
+
+    {% if state == 'expired' %}
+      <h1>הקישור פג תוקף</h1>
+      <p>הקישור ששותף איתך ישן מ־30 יום. בקש מהמטופל לייצר קישור חדש במסך ההגדרות.</p>
+
+    {% elif state == 'invalid' %}
+      <h1>קישור לא תקין</h1>
+      <p>הכתובת לא מזוהה. בקש מהמטופל את הקישור מחדש.</p>
+
+    {% elif state == 'needs_login' %}
+      <h1>היכנס כדי להתחבר ל־{{ patient.full_name or patient.email }}</h1>
+      <p>מטופל בשם <strong>{{ patient.full_name or patient.email }}</strong> שיתף איתך קישור.
+        כדי לאשר את החיבור, התחבר תחילה לחשבון המטפל שלך.</p>
+      <div class="connect-card__actions">
+        <a class="btn btn--primary" href="/auth/login?next=/connect/{{ token }}">כניסה לחשבון</a>
+        <a class="btn btn--ghost"  href="/auth/signup?next=/connect/{{ token }}">פתח חשבון חדש</a>
+      </div>
+      <p class="connect-card__note">לאחר כניסה תחזור לעמוד זה באופן אוטומטי.</p>
+
+    {% elif state == 'self_view' %}
+      <h1>זה הקישור שלך</h1>
+      <p>שתף את הכתובת הבאה עם המטפל שלך. רק מי שיש לו חשבון מטפל ב־MARAMARA יוכל לקבל את החיבור.</p>
+      <div class="connect-card__share">
+        <input class="form__input" readonly id="shareUrl" value="{{ share_url }}" />
+        <button class="btn btn--primary" type="button" onclick="navigator.clipboard.writeText(document.getElementById('shareUrl').value); this.textContent='הועתק';">העתק</button>
+      </div>
+
+    {% elif state == 'wrong_role' %}
+      <h1>הקישור מיועד למטפלים</h1>
+      <p>אתה מחובר כ<strong>{{ {'user':'משתמש','therapist':'מטפל','admin':'מנהל'}.get(user.role, user.role) }}</strong>.
+        קישור זה נועד לאנשי טיפול בלבד. אם אתה מטפל, צור קשר עם MARAMARA כדי להסב את החשבון.</p>
+
+    {% elif state == 'already_active' %}
+      <h1>כבר מחובר</h1>
+      <p>אתה כבר מחובר ל־<strong>{{ patient.full_name or patient.email }}</strong>.</p>
+      <div class="connect-card__actions">
+        <a class="btn btn--primary" href="/therapist/">פתח את דשבורד המטפל</a>
+      </div>
+
+    {% elif state == 'ready_to_accept' %}
+      <h1>לאשר חיבור למטופל</h1>
+      <p>מטופל ביקש לחבר אותך אליו כדי שתוכל לראות את ההתקדמות הרגשית שלו בזמן אמת.</p>
+      <div class="connect-card__patient">
+        <span class="connect-card__avatar">{{ (patient.full_name or patient.email)[:1] | upper }}</span>
+        <div>
+          <strong>{{ patient.full_name or patient.email }}</strong>
+          <small>{{ patient.email }}</small>
+        </div>
+      </div>
+      <p class="connect-card__disclaimer">
+        המטופל מודע לכך שבאישור חיבור זה, תוכל לראות את נתוני הניתוח שלו: מגמות רגשיות, נושאים,
+        טריגרים ודפוסים קוגניטיביים. גישה מתועדת ב־audit log.
+      </p>
+      <div class="connect-card__actions">
+        <button class="btn btn--primary" id="acceptBtn" type="button">אשר חיבור</button>
+        <a class="btn btn--ghost" href="/">לא עכשיו</a>
+      </div>
+      <p id="acceptStatus" class="connect-card__status" style="display:none;"></p>
+
+      <script>
+        document.getElementById('acceptBtn')?.addEventListener('click', async (e) => {
+          const btn = e.currentTarget;
+          const status = document.getElementById('acceptStatus');
+          btn.disabled = true;
+          btn.textContent = 'מעבד...';
+          try {
+            const res = await fetch('/connect/{{ token }}/accept', {
+              method: 'POST',
+              credentials: 'include',
+            });
+            const data = await res.json();
+            if (data.success) {
+              status.style.display = 'block';
+              status.textContent = 'החיבור אושר. מעביר לדשבורד...';
+              setTimeout(() => { window.location = data.data.redirect || '/therapist/'; }, 800);
+            } else {
+              throw new Error(data.error?.message || 'שגיאה');
+            }
+          } catch (err) {
+            status.style.display = 'block';
+            status.textContent = 'שגיאה: ' + err.message;
+            btn.disabled = false;
+            btn.textContent = 'אשר חיבור';
+          }
+        });
+      </script>
+    {% endif %}
+  </div>
+</section>
+
+<style>
+  .connect-page {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-6);
+  }
+  .connect-card {
+    max-width: 540px;
+    width: 100%;
+    background: var(--glass-surface-low);
+    backdrop-filter: blur(var(--blur-md)) saturate(180%);
+    -webkit-backdrop-filter: blur(var(--blur-md)) saturate(180%);
+    border-radius: var(--radius-2xl);
+    padding: var(--space-8) var(--space-7);
+    box-shadow: var(--shadow-lg);
+    text-align: start;
+  }
+  .connect-card__brand {
+    font-size: 0.8rem;
+    color: #6b5ce7;
+    letter-spacing: 0.15em;
+    font-weight: 700;
+    margin-bottom: var(--space-4);
+  }
+  .connect-card h1 {
+    font-size: clamp(1.4rem, 3vw, 2rem);
+    margin: 0 0 var(--space-4);
+    color: #104356;
+  }
+  .connect-card p { margin: 0 0 var(--space-4); color: #334155; line-height: 1.7; }
+  .connect-card__actions {
+    display: flex;
+    gap: var(--space-3);
+    flex-wrap: wrap;
+    margin-top: var(--space-5);
+  }
+  .connect-card__patient {
+    display: flex;
+    align-items: center;
+    gap: var(--space-4);
+    padding: var(--space-4);
+    background: rgba(107, 92, 231, 0.08);
+    border-radius: var(--radius-lg);
+    margin-bottom: var(--space-4);
+  }
+  .connect-card__avatar {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #8b7cf0, #6b5ce7);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 1.2rem;
+  }
+  .connect-card__patient small {
+    display: block;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+  }
+  .connect-card__disclaimer {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    background: rgba(148, 163, 184, 0.08);
+    padding: var(--space-3) var(--space-4);
+    border-radius: var(--radius-md);
+    border-inline-start: 3px solid #94a3b8;
+  }
+  .connect-card__note {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-top: var(--space-3);
+  }
+  .connect-card__share {
+    display: flex;
+    gap: var(--space-3);
+    margin: var(--space-4) 0;
+  }
+  .connect-card__share input { flex: 1; direction: ltr; text-align: left; }
+  .connect-card__status {
+    margin-top: var(--space-4);
+    color: var(--text-muted);
+  }
+</style>
+{% endblock %}

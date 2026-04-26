@@ -1,170 +1,368 @@
 {% extends 'base.html' %}
-{% block title %}האזנה — MARAMARA{% endblock %}
+{% block title %}מקושרים — MARAMARA{% endblock %}
 
 {% block content %}
-<section class="listen">
-  <h1>האזנה דיסקרטית</h1>
-  <p class="listen__subtitle">
-    האפליקציה מקליטה בקצרה, בודקת שזה הקול שלך, ומנתחת ברקע.
-    שום אודיו לא נשמר — רק תובנות.
-    <strong>ההקלטה ממשיכה גם כשאתה עובר דפים</strong> — תראה pod צף למטה.
-  </p>
+{% include 'partials/_mood_gauge.html' %}
 
-  <div class="listen__status">
-    <div id="statusIndicator" class="status-ring"></div>
+<section class="connections-page">
+  <header class="connections-head">
     <div>
-      <div id="statusLabel" class="status-label">מוכן</div>
-      <div id="chunkCount" class="status-time">—</div>
+      <h1 id="connectionsTitle">מקושרים אליך</h1>
+      <p class="connections-head__sub" id="connectionsSub">טוען…</p>
     </div>
+    <div class="connections-head__actions">
+      <button class="btn btn--primary" id="openShareBtn" type="button">שתף קישור למטפל</button>
+    </div>
+  </header>
+
+  <div id="connectionsEmpty" class="connections-empty" hidden>
+    <h3 id="emptyTitle">עוד לא מקושר אליך אף אחד</h3>
+    <p id="emptyBody">שתף קישור עם מטפל שלך כדי להתחיל. הוא יוכל לעקוב בזמן אמת אחרי ההתקדמות שלך.</p>
+    <button class="btn btn--primary" id="emptyShareBtn" type="button">צור קישור לשיתוף</button>
   </div>
 
-  <div class="listen__controls">
-    <button id="toggleBtn" class="btn btn--primary btn--lg">התחל האזנה</button>
-    <button id="recordOnceBtn" class="btn btn--ghost">הקלט 10 שניות עכשיו</button>
-  </div>
-
-  <section class="listen__schedule">
-    <h3>סטטוס</h3>
-    <p id="statusText">המיקרופון לא הופעל עדיין. לחץ "התחל האזנה" לבקשת הרשאה.</p>
-    <div id="uploadLog" class="upload-log" aria-live="polite"></div>
-  </section>
-
-  <section class="listen__schedule">
-    <h3 style="display: flex; justify-content: space-between; align-items: center;">
-      <span>הקלטות שנותחו היום</span>
-      <a href="/dashboard/recordings" class="btn btn--tertiary btn--sm">לכל ההקלטות →</a>
-    </h3>
-    <div id="recentList">טוען...</div>
-  </section>
+  <div id="connectionsGrid" class="connections-grid" hidden></div>
 </section>
 
+<!-- Share link modal -->
+<dialog id="shareDialog" class="connections-dialog">
+  <h3>שתף עם מטפל</h3>
+  <p style="color:var(--text-muted);margin:0 0 12px;font-size:0.9rem;">
+    קישור חד-פעמי, תקף ל־30 יום. מי שפותח את הקישור ומחובר כמטפל יתחבר אליך אוטומטית.
+  </p>
+  <div class="share-box">
+    <input id="shareUrlInput" class="form__input" readonly style="flex:1;direction:ltr;text-align:left;" />
+    <button class="btn btn--ghost" id="shareCopyBtn" type="button">העתק</button>
+  </div>
+  <div style="display:flex;gap:8px;margin-top:12px;">
+    <a id="shareWaBtn" class="btn btn--primary" target="_blank" rel="noopener">שלח ב־WhatsApp</a>
+    <button class="btn btn--ghost" type="button" data-close>סגור</button>
+  </div>
+</dialog>
+
 <style>
-  .upload-log { margin-top: var(--space-3); font-family: var(--font-label); font-size: var(--label-md); color: var(--text-muted); max-height: 200px; overflow-y: auto; }
-  .upload-log .log-line { padding: var(--space-2) 0; border-bottom: 1px solid var(--glass-border); }
-  .upload-log .log-line.ok { color: var(--color-success); }
-  .upload-log .log-line.skip { color: var(--text-muted); }
-  .upload-log .log-line.err { color: var(--error); }
+  .connections-page {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: var(--space-6) var(--space-5);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-6);
+  }
+  .connections-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    gap: var(--space-5);
+    padding-bottom: var(--space-4);
+    border-bottom: 1px solid var(--glass-border, rgba(107,92,231,0.15));
+  }
+  .connections-head h1 {
+    margin: 0 0 var(--space-2);
+    font-family: var(--font-display, var(--font-body));
+    font-size: clamp(1.6rem, 4vw, 2.2rem);
+  }
+  .connections-head__sub { margin: 0; color: var(--text-muted); }
+
+  .connections-empty {
+    background: var(--glass-surface-low);
+    backdrop-filter: blur(var(--blur-md)) saturate(180%);
+    -webkit-backdrop-filter: blur(var(--blur-md)) saturate(180%);
+    border-radius: var(--radius-2xl);
+    padding: var(--space-8);
+    text-align: center;
+    box-shadow: var(--inner-top), var(--shadow-md);
+  }
+  .connections-empty h3 { margin: 0 0 var(--space-3); color: var(--text); }
+  .connections-empty p  { margin: 0 0 var(--space-5); color: var(--text-muted); }
+
+  .connections-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: var(--space-5);
+  }
+
+  .connection-card {
+    background: rgba(255, 255, 255, 0.78);
+    border: 1px solid rgba(255, 255, 255, 0.6);
+    border-radius: var(--radius-2xl);
+    padding: var(--space-4) var(--space-5);
+    box-shadow: var(--inner-top), var(--shadow-md);
+    text-decoration: none;
+    color: inherit;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    transition: transform 200ms ease, box-shadow 200ms ease;
+    position: relative;
+    cursor: pointer;
+  }
+  .connection-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 16px 44px rgba(16, 67, 86, 0.16);
+  }
+  .connection-card__head { display: flex; align-items: center; gap: var(--space-3); }
+  .connection-card__avatar {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #8b7cf0, #6b5ce7);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 1.1rem;
+    flex-shrink: 0;
+  }
+  .connection-card__name { font-weight: 700; color: #104356; line-height: 1.2; }
+  .connection-card__email {
+    color: var(--text-muted);
+    font-size: 0.78rem;
+    margin-top: 2px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .connection-card__gauge {
+    display: flex;
+    justify-content: center;
+    margin: var(--space-2) auto 0;
+    width: 100%;
+    max-width: 220px;
+  }
+  .connection-card__stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-3);
+    padding-top: var(--space-3);
+    border-top: 1px dashed rgba(107, 92, 231, 0.18);
+  }
+  .connection-card__stat span:first-child { display: block; font-size: 0.75rem; color: var(--text-muted); }
+  .connection-card__stat strong { font-size: 1rem; color: #104356; }
+  .connection-card__cta {
+    font-size: 0.85rem;
+    color: var(--accent-purple, #6b5ce7);
+    font-weight: 600;
+    text-align: center;
+    padding-top: var(--space-2);
+  }
+  .connection-card--demo { opacity: 0.92; }
+  .connection-card__demo-badge {
+    position: absolute;
+    top: 12px;
+    inset-inline-start: 12px;
+    background: rgba(148, 163, 184, 0.18);
+    color: #64748b;
+    font-size: 0.65rem;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 999px;
+    letter-spacing: 0.1em;
+  }
+  .connection-card__pulse {
+    position: absolute;
+    top: 14px;
+    inset-inline-end: 14px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #94a3b8;
+  }
+  .connection-card__pulse.is-fresh {
+    background: #10b981;
+    box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.2);
+    animation: conn-pulse 2s ease-in-out infinite;
+  }
+  @keyframes conn-pulse {
+    0%, 100% { box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.2); }
+    50%      { box-shadow: 0 0 0 8px rgba(16, 185, 129, 0.08); }
+  }
+
+  .connections-dialog {
+    border: 0;
+    border-radius: var(--radius-2xl);
+    padding: var(--space-6);
+    max-width: 520px;
+    width: calc(100% - var(--space-6));
+    box-shadow: 0 24px 80px rgba(16, 67, 86, 0.28);
+  }
+  .connections-dialog::backdrop { background: rgba(15, 23, 42, 0.38); }
+  .connections-dialog h3 { margin: 0 0 var(--space-2); }
+  .share-box { display: flex; gap: var(--space-2); align-items: center; margin-top: var(--space-3); }
 </style>
 
 <script>
-// IIFE to avoid top-level redeclaration errors when SPA nav re-runs this
-// script on page re-entry. Also cleans up the refresh interval + stopped
-// listener on navigation away so they don't accumulate.
 (function () {
-  const btn = document.getElementById('toggleBtn');
-  const recOnce = document.getElementById('recordOnceBtn');
-  const indicator = document.getElementById('statusIndicator');
-  const label = document.getElementById('statusLabel');
-  const statusText = document.getElementById('statusText');
-  const chunkCountEl = document.getElementById('chunkCount');
-  const uploadLog = document.getElementById('uploadLog');
+  const titleEl = document.getElementById('connectionsTitle');
+  const subEl = document.getElementById('connectionsSub');
+  const emptyBox = document.getElementById('connectionsEmpty');
+  const emptyTitle = document.getElementById('emptyTitle');
+  const emptyBody = document.getElementById('emptyBody');
+  const grid = document.getElementById('connectionsGrid');
 
-  if (!btn) return; // not on listen page
+  const shareDialog = document.getElementById('shareDialog');
+  const shareInput = document.getElementById('shareUrlInput');
+  const shareCopy  = document.getElementById('shareCopyBtn');
+  const shareWa    = document.getElementById('shareWaBtn');
 
-  function log(text, kind = '') {
-    const row = document.createElement('div');
-    row.className = `log-line ${kind}`;
-    row.textContent = `${new Date().toLocaleTimeString('he-IL')} — ${text}`;
-    uploadLog.insertBefore(row, uploadLog.firstChild);
-    while (uploadLog.children.length > 20) uploadLog.removeChild(uploadLog.lastChild);
+  function timeAgoHe(iso) {
+    if (!iso) return 'עוד לא פעיל';
+    const d = new Date(iso);
+    const mins = Math.floor((Date.now() - d.getTime()) / 60000);
+    if (mins < 1) return 'עכשיו';
+    if (mins < 60) return `לפני ${mins} דק׳`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return `לפני ${hrs} שע׳`;
+    const days = Math.floor(hrs / 24);
+    return `לפני ${days} ימים`;
   }
 
-  function syncUI() {
-    const R = window.MARAMARA_RECORDER;
-    const active = R?.isActive();
-    if (active) {
-      btn.textContent = 'עצור האזנה';
-      indicator.classList.add('status-ring--active');
-      label.textContent = 'מקשיב...';
-      statusText.textContent = 'ההקלטה פעילה ותמשיך גם אם תעבור לדפים אחרים.';
-    } else {
-      btn.textContent = 'התחל האזנה';
-      indicator.classList.remove('status-ring--active');
-      label.textContent = 'מוכן';
-    }
-    chunkCountEl.textContent = `${R?.getCount() || 0} קטעים הועלו`;
+  function isFresh(iso, withinMinutes = 10) {
+    if (!iso) return false;
+    return (Date.now() - new Date(iso).getTime()) < withinMinutes * 60 * 1000;
   }
 
-  btn.addEventListener('click', async () => {
-    const R = window.MARAMARA_RECORDER;
-    if (!R) { log('Recorder not initialised', 'err'); return; }
-    if (!R.isActive()) {
-      log('מפעיל מיקרופון...', '');
-      const ok = await R.start();
-      if (ok !== false) log('הקלטה רציפה פעילה — 10 שניות כל 15 שניות', 'ok');
-    } else {
-      R.stop();
-      log('ההקלטה נעצרה', '');
-    }
-    syncUI();
-  });
+  function escapeHtml(s) {
+    return String(s ?? '').replace(/[&<>"']/g, c =>
+      ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
 
-  recOnce.addEventListener('click', async () => {
-    log('מקליט 10 שניות בודדות...', '');
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, sampleRate: 16000 } });
-      const mt = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus' : '';
-      const rec = new MediaRecorder(stream, mt ? { mimeType: mt } : {});
-      const chunks = [];
-      rec.ondataavailable = e => chunks.push(e.data);
-      rec.start();
-      await new Promise(r => setTimeout(r, 10000));
-      rec.stop();
-      await new Promise(r => rec.onstop = r);
-      stream.getTracks().forEach(t => t.stop());
-      const blob = new Blob(chunks, { type: mt || 'audio/webm' });
-      const fd = new FormData();
-      fd.append('audio', blob, 'chunk.webm');
-      fd.append('duration_sec', '10');
-      fd.append('started_at', new Date(Date.now() - 10000).toISOString());
-      fd.append('ended_at', new Date().toISOString());
-      const res = await fetch('/api/audio/chunk', { method: 'POST', body: fd, credentials: 'include' });
-      const data = await res.json();
-      if (data?.success) {
-        if (data.data?.skipped === 'no_speech') log('דולג — לא זוהה דיבור', 'skip');
-        else if (data.data?.segment_id) log(`הועלה ונשלח לניתוח`, 'ok');
-        else log('הועלה', 'ok');
-        setTimeout(refreshRecent, 6000);
-      } else {
-        log(`שגיאה: ${data?.error?.message || res.status}`, 'err');
-      }
-    } catch (e) {
-      log(`שגיאה: ${e.message}`, 'err');
-    }
-  });
+  // Demo data shown when there are no real connections — so you can see the
+  // gallery layout. Remove by deleting this block + the `if (!items.length)`
+  // override below.
+  const DEMO_CONNECTIONS = [
+    { id: 'demo-1', full_name: 'רותם לוי',      email: 'rotem@example.com',   mood_score:  0.72, segments_7d: 84, total_polarity: 84, last_active: new Date(Date.now() - 3  * 60 * 1000).toISOString() },
+    { id: 'demo-2', full_name: 'דניאל כהן',     email: 'daniel@example.com',  mood_score: -0.38, segments_7d: 52, total_polarity: 52, last_active: new Date(Date.now() - 18 * 60 * 1000).toISOString() },
+    { id: 'demo-3', full_name: 'שירה אבני',     email: 'shira@example.com',   mood_score:  0.12, segments_7d: 37, total_polarity: 37, last_active: new Date(Date.now() - 2  * 60 * 60 * 1000).toISOString() },
+    { id: 'demo-4', full_name: 'אמיר שטרן',     email: 'amir@example.com',    mood_score: -0.78, segments_7d: 19, total_polarity: 19, last_active: new Date(Date.now() - 40 * 60 * 1000).toISOString() },
+    { id: 'demo-5', full_name: 'נעה ברקוביץ',   email: 'noa@example.com',     mood_score:  0.46, segments_7d: 61, total_polarity: 61, last_active: new Date(Date.now() - 6  * 60 * 60 * 1000).toISOString() },
+    { id: 'demo-6', full_name: 'יואב כרמלי',    email: 'yoav@example.com',    mood_score:  0.00, segments_7d: 8,  total_polarity:  8, last_active: new Date(Date.now() - 3  * 24 * 60 * 60 * 1000).toISOString() },
+  ].map(p => ({ ...p, kind: 'patient', open_url: '#demo-' + p.id, is_demo: true }));
 
-  async function refreshRecent() {
+  async function loadConnections() {
     try {
-      const res = await fetch('/dashboard/api/segments?limit=10', { credentials: 'include' });
+      const res = await fetch('/dashboard/api/my-connections', { credentials: 'include' });
       const body = await res.json();
-      const list = document.getElementById('recentList');
-      if (!list) return; // navigated away
-      const items = body.data || [];
+      const data = body.data || {};
+      const role = data.role || 'user';
+      let items = data.connections || [];
+      let showingDemo = false;
+
+      // If the user has no real connections, fall back to demo data so the
+      // gallery is visible. Demo cards are clearly marked and not clickable.
       if (!items.length) {
-        list.textContent = 'עדיין אין ניתוחים. הקלט קטע שיציג כאן את התוצאות.';
-      } else {
-        list.innerHTML = items.slice(0, 5).map(it => {
-          const t = it.transcript?.transcript_text || '(אין תמלול)';
-          const time = new Date(it.started_at).toLocaleTimeString('he-IL');
-          return `<div class="log-line">🕐 ${time} — ${t.slice(0, 120)}</div>`;
-        }).join('');
+        items = DEMO_CONNECTIONS;
+        showingDemo = true;
       }
-      syncUI();
-    } catch (e) {}
+
+      if (role === 'therapist' || role === 'admin') {
+        titleEl.textContent = 'המטופלים שלך';
+        subEl.textContent = showingDemo
+          ? '6 מטופלים לדוגמה (דמו) — עוד אין חיבורים אמיתיים.'
+          : `${items.length} מטופלים מקושרים. נתונים חיים, מתעדכן כל 30 שניות.`;
+      } else {
+        titleEl.textContent = 'מקושרים אליך';
+        subEl.textContent = showingDemo
+          ? '6 מקושרים לדוגמה (דמו). צור קישור שיתוף אמיתי כדי להחליף אותם.'
+          : `${items.length} מקושרים.`;
+      }
+
+      emptyBox.hidden = true;
+      grid.hidden = false;
+
+      grid.innerHTML = '';
+      for (const p of items) {
+        const card = document.createElement('a');
+        card.className = 'connection-card' + (p.is_demo ? ' connection-card--demo' : '');
+        if (p.open_url && !p.is_demo) {
+          card.href = p.open_url;
+        } else {
+          card.style.cursor = 'default';
+          card.addEventListener('click', (e) => e.preventDefault());
+        }
+        const initial = (p.full_name || p.email || '?').slice(0, 1).toUpperCase();
+        const hasMood = typeof p.mood_score === 'number';
+
+        card.innerHTML = `
+          ${p.is_demo ? `<span class="connection-card__demo-badge">דמו</span>` : ''}
+          ${p.last_active !== undefined ? `<span class="connection-card__pulse ${isFresh(p.last_active) ? 'is-fresh' : ''}" title="${timeAgoHe(p.last_active)}"></span>` : ''}
+          <div class="connection-card__head">
+            <span class="connection-card__avatar">${escapeHtml(initial)}</span>
+            <div style="min-width:0;flex:1;">
+              <div class="connection-card__name">${escapeHtml(p.full_name)}</div>
+              <div class="connection-card__email">${escapeHtml(p.email || '')}</div>
+            </div>
+          </div>
+          ${hasMood ? `<div class="connection-card__gauge" id="conn-gauge-${p.id}"></div>` : ''}
+          ${hasMood ? `
+          <div class="connection-card__stats">
+            <div class="connection-card__stat">
+              <span>קטעים (7 ימים)</span>
+              <strong>${p.segments_7d ?? 0}</strong>
+            </div>
+            <div class="connection-card__stat">
+              <span>פעיל לאחרונה</span>
+              <strong>${timeAgoHe(p.last_active)}</strong>
+            </div>
+          </div>
+          ` : ''}
+          ${p.open_url && !p.is_demo ? `<div class="connection-card__cta">לחץ לצפייה בתובנות ←</div>` : ''}
+        `;
+        grid.appendChild(card);
+
+        if (hasMood) {
+          window.MARAMARA.renderMoodGauge(
+            document.getElementById(`conn-gauge-${p.id}`),
+            p.mood_score,
+            { size: 220, subtitle: `${p.total_polarity ?? 0} קטעים` }
+          );
+        }
+      }
+    } catch (err) {
+      console.error('connections load failed', err);
+    }
   }
 
-  const intervalId = setInterval(refreshRecent, 10000);
-  window.addEventListener('maramara:stopped', syncUI);
-
-  function cleanup() {
-    clearInterval(intervalId);
-    window.removeEventListener('maramara:stopped', syncUI);
-    window.removeEventListener('maramara:navigated', cleanup);
+  async function openShare() {
+    try {
+      const res = await fetch('/dashboard/api/share-link', { method: 'POST', credentials: 'include' });
+      const body = await res.json();
+      if (!body.success) throw new Error(body.error?.message || 'שגיאה');
+      shareInput.value = body.data.url;
+      const msg = encodeURIComponent(`הנה קישור MARAMARA שלי, אישור יחבר אותנו: ${body.data.url}`);
+      shareWa.href = `https://wa.me/?text=${msg}`;
+      shareDialog.showModal();
+    } catch (err) {
+      alert('שגיאה: ' + err.message);
+    }
   }
-  window.addEventListener('maramara:navigated', cleanup);
 
-  refreshRecent();
-  syncUI();
+  document.getElementById('openShareBtn')?.addEventListener('click', (e) => {
+    if (e.currentTarget.textContent.includes('מטופל')) {
+      window.location.href = '/therapist/';
+    } else {
+      openShare();
+    }
+  });
+  document.getElementById('emptyShareBtn')?.addEventListener('click', (e) => {
+    if (e.currentTarget.textContent.includes('דשבורד')) {
+      window.location.href = '/therapist/';
+    } else {
+      openShare();
+    }
+  });
+  document.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', () => shareDialog.close()));
+
+  shareCopy?.addEventListener('click', async () => {
+    try { await navigator.clipboard.writeText(shareInput.value); shareCopy.textContent = 'הועתק'; }
+    catch (_) { shareInput.select(); document.execCommand('copy'); shareCopy.textContent = 'הועתק'; }
+    setTimeout(() => { shareCopy.textContent = 'העתק'; }, 1600);
+  });
+
+  loadConnections();
+  const timerId = setInterval(loadConnections, 30000);
+  window.addEventListener('maramara:navigated', () => clearInterval(timerId));
 })();
 </script>
 {% endblock %}

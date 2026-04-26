@@ -1,0 +1,308 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <title>דוח אישי — MARAMARA</title>
+  <style>
+    @page {
+      size: A4;
+      margin: 18mm 16mm 20mm 16mm;
+      @bottom-center {
+        content: "MARAMARA — דוח אישי  ·  עמוד " counter(page) " מתוך " counter(pages);
+        font-size: 9pt;
+        color: #94a3b8;
+      }
+    }
+
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      font-family: "Rubik", "Assistant", "Segoe UI", Tahoma, sans-serif;
+      color: #0f172a;
+      font-size: 10.5pt;
+      line-height: 1.55;
+      direction: rtl;
+    }
+
+    h1, h2, h3 { margin: 0; color: #104356; font-weight: 700; }
+    p { margin: 0 0 8pt; }
+
+    /* ---------- cover ---------- */
+    .cover {
+      padding: 16pt 18pt;
+      border-radius: 18pt;
+      background: linear-gradient(135deg, #ede9ff 0%, #e0f2fe 100%);
+      margin-bottom: 16pt;
+      page-break-after: avoid;
+    }
+    .cover__brand {
+      font-size: 10pt;
+      letter-spacing: 0.2em;
+      color: #6b5ce7;
+      font-weight: 700;
+      margin-bottom: 6pt;
+    }
+    .cover h1 { font-size: 26pt; line-height: 1.1; margin-bottom: 4pt; color: #104356; }
+    .cover__subtitle { color: #475569; font-size: 11pt; margin-bottom: 10pt; }
+    .cover__meta {
+      display: flex;
+      gap: 22pt;
+      color: #64748b;
+      font-size: 9.5pt;
+    }
+    .cover__meta span strong { color: #0f172a; display: block; font-size: 10.5pt; }
+
+    /* ---------- stat cards ---------- */
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10pt;
+      margin-bottom: 16pt;
+    }
+    .stat {
+      background: #fff;
+      border: 1px solid #e2e8f0;
+      border-radius: 12pt;
+      padding: 10pt 12pt;
+    }
+    .stat__label { font-size: 8.5pt; color: #64748b; text-transform: uppercase; letter-spacing: 0.08em; }
+    .stat__value { font-size: 20pt; font-weight: 700; color: #104356; margin-top: 2pt; line-height: 1.15; }
+    .stat__hint  { font-size: 8.5pt; color: #94a3b8; margin-top: 2pt; }
+
+    /* ---------- sections ---------- */
+    .section {
+      background: #fff;
+      border: 1px solid #eef2f7;
+      border-radius: 14pt;
+      padding: 12pt 14pt;
+      margin-bottom: 12pt;
+      page-break-inside: avoid;
+    }
+    .section h2 {
+      font-size: 13pt;
+      margin-bottom: 2pt;
+    }
+    .section__sub { font-size: 9.5pt; color: #64748b; margin-bottom: 10pt; }
+
+    .two-col {
+      display: grid;
+      grid-template-columns: 1.4fr 1fr;
+      gap: 14pt;
+      align-items: start;
+    }
+
+    /* ---------- narrative ---------- */
+    .narrative {
+      background: linear-gradient(135deg, #fdf4ff 0%, #eff6ff 100%);
+      border: 1px solid #e9d5ff;
+      border-radius: 14pt;
+      padding: 14pt 16pt;
+      margin-bottom: 14pt;
+    }
+    .narrative h2 {
+      color: #6b5ce7;
+      font-size: 14pt;
+      margin-bottom: 8pt;
+    }
+    .narrative p { font-size: 10.5pt; line-height: 1.7; color: #1e293b; }
+
+    /* ---------- transcript samples ---------- */
+    .samples { display: flex; flex-direction: column; gap: 8pt; }
+    .sample {
+      border: 1px solid #eef2f7;
+      border-radius: 10pt;
+      padding: 8pt 10pt;
+      background: #fafbff;
+    }
+    .sample__meta {
+      display: flex;
+      justify-content: space-between;
+      font-size: 8.5pt;
+      color: #64748b;
+      margin-bottom: 4pt;
+    }
+    .sample__text { font-size: 10pt; color: #0f172a; line-height: 1.55; }
+    .pill {
+      display: inline-block;
+      padding: 1pt 7pt;
+      border-radius: 999pt;
+      font-size: 8.5pt;
+      font-weight: 600;
+    }
+    .pill--positive { background: #d1fae5; color: #065f46; }
+    .pill--negative { background: #fee2e2; color: #991b1b; }
+    .pill--neutral  { background: #e2e8f0; color: #334155; }
+    .pill--mixed    { background: #ede9fe; color: #5b21b6; }
+
+    ul.clean { padding: 0; margin: 0; list-style: none; }
+    ul.clean li {
+      padding: 6pt 0;
+      border-bottom: 1px dashed #e2e8f0;
+      font-size: 10pt;
+    }
+    ul.clean li:last-child { border-bottom: 0; }
+    ul.clean .count { color: #94a3b8; font-size: 9pt; margin-right: 6pt; }
+
+    .footer-note {
+      text-align: center;
+      font-size: 9pt;
+      color: #94a3b8;
+      margin-top: 14pt;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- COVER -->
+  <div class="cover">
+    <div class="cover__brand">MARAMARA · דוח אישי</div>
+    <h1>תמונת המצב שלך ב־30 הימים האחרונים</h1>
+    <p class="cover__subtitle">ניתוח רגשי-שפתי של דפוסי הדיבור שלך — איך אתה מדבר עם העולם, מה מפעיל, ומה מרגיע.</p>
+    <div class="cover__meta">
+      <span>הופק ב<strong>{{ data.generated_at }}</strong></span>
+      <span>טווח<strong>{{ data.window_start }} — {{ data.window_end }}</strong></span>
+      {% if user_email %}<span>משתמש<strong>{{ user_email }}</strong></span>{% endif %}
+    </div>
+  </div>
+
+  <!-- STATS -->
+  <div class="stats">
+    <div class="stat">
+      <div class="stat__label">קטעים מוקלטים</div>
+      <div class="stat__value">{{ data.total_segments }}</div>
+      <div class="stat__hint">ב־30 הימים</div>
+    </div>
+    <div class="stat">
+      <div class="stat__label">זמן דיבור</div>
+      <div class="stat__value">{{ "%.0f"|format(data.total_minutes) }}׳</div>
+      <div class="stat__hint">דקות סה״כ</div>
+    </div>
+    <div class="stat">
+      <div class="stat__label">אינטנסיביות ממוצעת</div>
+      <div class="stat__value">{{ "%.1f"|format(data.avg_intensity) }}</div>
+      <div class="stat__hint">על סולם 0–10</div>
+    </div>
+    <div class="stat">
+      <div class="stat__label">חלוקת רגש</div>
+      <div class="stat__value" style="font-size:13pt;line-height:1.2;">
+        {{ data.polarity.positive }}·{{ data.polarity.neutral }}·{{ data.polarity.negative }}
+      </div>
+      <div class="stat__hint">חיובי · נייטרלי · שלילי</div>
+    </div>
+  </div>
+
+  <!-- AI NARRATIVE -->
+  <div class="narrative">
+    <h2>ניתוח מעמיק — Claude</h2>
+    {% for para in data.narrative.split('\n\n') %}
+      {% if para.strip() %}<p>{{ para.strip() }}</p>{% endif %}
+    {% endfor %}
+  </div>
+
+  <!-- TREND CHART -->
+  <div class="section">
+    <h2>מגמת אינטנסיביות יומית</h2>
+    <p class="section__sub">רמת עוצמה רגשית ממוצעת לאורך 30 הימים. גבוה = תנודה חזקה.</p>
+    {{ charts.trend | safe }}
+  </div>
+
+  <!-- POLARITY + TOPICS -->
+  <div class="two-col">
+    <div class="section">
+      <h2>נושאים חוזרים</h2>
+      <p class="section__sub">במה עסקה רוב השיחה.</p>
+      {% if charts.topics %}
+        {{ charts.topics | safe }}
+      {% else %}
+        <p style="color:#94a3b8">אין מספיק נתונים.</p>
+      {% endif %}
+    </div>
+    <div class="section">
+      <h2>חלוקת רגש</h2>
+      <p class="section__sub">איך מתחלקים הקטעים שנותחו.</p>
+      {{ charts.polarity | safe }}
+    </div>
+  </div>
+
+  <!-- TRIGGERS + CALMING -->
+  <div class="two-col">
+    <div class="section">
+      <h2>טריגרים מובילים</h2>
+      <p class="section__sub">מה מעורר תגובה רגשית חזקה.</p>
+      {% if data.top_triggers %}
+      <ul class="clean">
+        {% for t in data.top_triggers %}
+          <li><span class="count">×{{ t.count }}</span>{{ t.text }}</li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <p style="color:#94a3b8">לא זוהו טריגרים חוזרים.</p>
+      {% endif %}
+    </div>
+    <div class="section">
+      <h2>אלמנטים מרגיעים</h2>
+      <p class="section__sub">מה עובד לך — מקורות הרגעה.</p>
+      {% if data.top_calming %}
+      <ul class="clean">
+        {% for c in data.top_calming %}
+          <li><span class="count">×{{ c.count }}</span>{{ c.text }}</li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <p style="color:#94a3b8">לא זוהו אלמנטים מרגיעים חוזרים.</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- TOP PHRASES + COGNITIVE PATTERNS -->
+  <div class="two-col">
+    <div class="section">
+      <h2>ביטויים בולטים</h2>
+      <p class="section__sub">מילים וצירופים חוזרים.</p>
+      {% if charts.phrases %}
+        {{ charts.phrases | safe }}
+      {% else %}
+        <p style="color:#94a3b8">אין מספיק נתונים.</p>
+      {% endif %}
+    </div>
+    <div class="section">
+      <h2>דפוסים קוגניטיביים</h2>
+      <p class="section__sub">מחשבות אוטומטיות שהתגלו בניתוח.</p>
+      {% if data.cognitive_patterns %}
+      <ul class="clean">
+        {% for p in data.cognitive_patterns %}
+          <li><span class="count">×{{ p.count }}</span>{{ p.pattern }}</li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <p style="color:#94a3b8">לא זוהו דפוסים בולטים.</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- SAMPLE TRANSCRIPTS -->
+  {% if data.sample_transcripts %}
+  <div class="section">
+    <h2>דגימות מייצגות</h2>
+    <p class="section__sub">5 הקטעים האחרונים עם ניתוח.</p>
+    <div class="samples">
+      {% for s in data.sample_transcripts %}
+        <div class="sample">
+          <div class="sample__meta">
+            <span>{{ s.started_at[:16].replace('T', ' ') }} · נושא: {{ s.topic or '—' }} · אינטנסיביות {{ "%.1f"|format(s.intensity) }}</span>
+            <span class="pill pill--{{ s.polarity }}">{{ {'positive':'חיובי','negative':'שלילי','neutral':'נייטרלי','mixed':'מעורב'}.get(s.polarity, s.polarity) }}</span>
+          </div>
+          <div class="sample__text">{{ s.text or '—' }}</div>
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="footer-note">
+    הדוח הזה הופק אוטומטית מתוך הקלטות VAD שלך ונותח על ידי Claude Sonnet.
+    הוא לא מחליף ייעוץ מקצועי.
+  </div>
+</body>
+</html>

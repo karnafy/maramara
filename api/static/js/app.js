@@ -119,5 +119,44 @@
     } catch { return null; }
   }
 
-  window.MARAMARA = { switchLang, loadMe, navigateTo };
+  // ----- Topic → Hebrew label + SVG icon -----
+  // Used across home, insights, recordings to render topics consistently in RTL.
+  const TOPIC_MAP = {
+    work:          { he: 'עבודה',  icon: 'briefcase' },
+    relationships: { he: 'זוגיות',  icon: 'heart' },
+    family:        { he: 'משפחה',   icon: 'home' },
+    health:        { he: 'בריאות',  icon: 'pulse' },
+    money:         { he: 'כסף',     icon: 'wallet' },
+    self:          { he: 'עצמי',    icon: 'user' },
+    environment:   { he: 'סביבה',   icon: 'globe' },
+    other:         { he: 'אחר',     icon: 'dots' },
+  };
+  const TOPIC_ICONS = {
+    briefcase: '<path d="M9 4h6a2 2 0 0 1 2 2v2h3a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-9a2 2 0 0 1 2-2h3V6a2 2 0 0 1 2-2zm0 4h6V6H9v2z" fill="currentColor"/>',
+    heart:     '<path d="M12 21s-7-4.5-9.5-9A5.5 5.5 0 0 1 12 6a5.5 5.5 0 0 1 9.5 6c-2.5 4.5-9.5 9-9.5 9z" fill="currentColor"/>',
+    home:      '<path d="M3 11.5 12 4l9 7.5V20a2 2 0 0 1-2 2h-4v-6h-6v6H5a2 2 0 0 1-2-2v-8.5z" fill="currentColor"/>',
+    pulse:     '<path d="M3 12h4l2-6 4 12 2-6h6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>',
+    wallet:    '<path d="M3 7a2 2 0 0 1 2-2h12v2H5v10h14V9h-3a2 2 0 0 0 0 4h4v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" fill="currentColor"/>',
+    user:      '<path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zm-7 9a7 7 0 1 1 14 0H5z" fill="currentColor"/>',
+    globe:     '<path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 2a8 8 0 0 1 3.5.8c-.5 1-1.4 1.7-2.5 1.9V8a2 2 0 0 1-2 2H9a2 2 0 0 0-2 2v1a2 2 0 0 0 2 2h1v3a2 2 0 0 0 2 2v-.1A8 8 0 0 1 12 4z" fill="currentColor"/>',
+    dots:      '<circle cx="5" cy="12" r="2" fill="currentColor"/><circle cx="12" cy="12" r="2" fill="currentColor"/><circle cx="19" cy="12" r="2" fill="currentColor"/>',
+  };
+
+  function topicLabel(raw) {
+    if (!raw) return 'אחר';
+    const k = String(raw).toLowerCase().trim();
+    return (TOPIC_MAP[k] && TOPIC_MAP[k].he) || raw;
+  }
+  function topicIconSvg(raw) {
+    const k = String(raw || 'other').toLowerCase().trim();
+    const name = (TOPIC_MAP[k] && TOPIC_MAP[k].icon) || 'dots';
+    const inner = TOPIC_ICONS[name] || TOPIC_ICONS.dots;
+    return `<svg viewBox="0 0 24 24" aria-hidden="true">${inner}</svg>`;
+  }
+
+  // Merge — don't overwrite. Other partials (e.g. _mood_gauge.html) also
+  // populate window.MARAMARA, and this script runs after them.
+  window.MARAMARA = Object.assign(window.MARAMARA || {}, {
+    switchLang, loadMe, navigateTo, topicLabel, topicIconSvg,
+  });
 })();

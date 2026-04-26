@@ -165,6 +165,19 @@ section { margin-bottom: var(--space-12); }
   border-radius: var(--radius-full);
 }
 .nav__logo { font-size: 1.4rem; }
+.nav__wordmark {
+  display: inline-block;
+  width: 200px;
+  height: 64px;
+  background-repeat: no-repeat;
+  background-position: center center;
+  /* Source PNG has ~60% whitespace around the letters — zoom in so the
+     wordmark actually reads at nav size. */
+  background-size: auto 260%;
+}
+@media (max-width: 640px) {
+  .nav__wordmark { width: 140px; height: 48px; background-size: auto 260%; }
+}
 .nav__links {
   list-style: none;
   display: flex;
@@ -269,9 +282,11 @@ section { margin-bottom: var(--space-12); }
   justify-content: center;
 }
 .hero__mirror {
-  font-size: 7rem;
+  width: clamp(180px, 26vw, 280px);
+  height: auto;
+  object-fit: contain;
   z-index: 2;
-  filter: drop-shadow(0 0 50px rgba(168, 126, 255, 0.5));
+  filter: drop-shadow(0 12px 40px rgba(139, 53, 82, 0.35));
 }
 .hero__pulse {
   position: absolute;

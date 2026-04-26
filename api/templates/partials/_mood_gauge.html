@@ -1,0 +1,109 @@
+{# Reusable mood gauge.
+   Renders a semicircular meter from -1 (שלילי) to +1 (חיובי) with a needle.
+   Client-side via window.MARAMARA.renderMoodGauge(container, value, opts).
+   This partial just ships the JS helper once per page. #}
+<script>
+(function () {
+  if (window.MARAMARA?.renderMoodGauge) return;
+  window.MARAMARA = window.MARAMARA || {};
+
+  // Draw a semicircle gauge into `container` (any DOM element with a width).
+  // value: clamped to [-1, +1]. -1 = very negative, 0 = neutral, +1 = very positive.
+  // opts: { size?: number, label?: string, subtitle?: string }
+  window.MARAMARA.renderMoodGauge = function (container, value, opts) {
+    if (!container) return;
+    opts = opts || {};
+    const size = opts.size || 280;
+    const W = size, H = Math.round(size * 0.62);
+    const cx = W / 2;
+    const cy = H - 20;
+    const r = size * 0.40;
+    const v = Math.max(-1, Math.min(1, value || 0));
+
+    // Colored arc segments (5): from -1..-0.6 red, -.6..-.2 orange, -.2..+.2 grey,
+    // +.2..+.6 teal, +.6..+1 green.
+    const seg = (start, end, color) => {
+      const a1 = Math.PI - ((start + 1) / 2) * Math.PI; // -1 -> π,  +1 -> 0
+      const a2 = Math.PI - ((end + 1) / 2) * Math.PI;
+      const x1 = cx + Math.cos(a1) * r, y1 = cy - Math.sin(a1) * r;
+      const x2 = cx + Math.cos(a2) * r, y2 = cy - Math.sin(a2) * r;
+      const large = Math.abs(a1 - a2) > Math.PI ? 1 : 0;
+      // Sweep from start angle to end; sweep-flag = 0 because we go angle decreases
+      return `<path d="M ${x1.toFixed(1)},${y1.toFixed(1)} A ${r},${r} 0 ${large} 0 ${x2.toFixed(1)},${y2.toFixed(1)}"
+                stroke="${color}" stroke-width="18" fill="none" stroke-linecap="butt" />`;
+    };
+
+    // 5 zones — each aligns with a chip color below.
+    const arcs = [
+      seg(-1.0, -0.6, '#ef4444'),  // שלילי חזק   — red
+      seg(-0.6, -0.2, '#f97316'),  // שלילי       — orange
+      seg(-0.2,  0.2, '#94a3b8'),  // ניטרלי      — grey
+      seg( 0.2,  0.6, '#6dd5ed'),  // חיובי מתון  — teal (תכלת)
+      seg( 0.6,  1.0, '#10b981'),  // חיובי חזק   — green
+    ].join('');
+
+    // Needle
+    const needleAngle = Math.PI - ((v + 1) / 2) * Math.PI;
+    const tipX  = cx + Math.cos(needleAngle) * (r * 0.92);
+    const tipY  = cy - Math.sin(needleAngle) * (r * 0.92);
+    const baseLeftX  = cx + Math.cos(needleAngle + Math.PI / 2) * 6;
+    const baseLeftY  = cy - Math.sin(needleAngle + Math.PI / 2) * 6;
+    const baseRightX = cx + Math.cos(needleAngle - Math.PI / 2) * 6;
+    const baseRightY = cy - Math.sin(needleAngle - Math.PI / 2) * 6;
+
+    // End labels
+    const leftEnd  = { x: cx - r - 4, y: cy + 14, text: '−' };
+    const rightEnd = { x: cx + r + 4, y: cy + 14, text: '+' };
+
+    // Value display
+    const pct = Math.round(v * 100);
+    const pctText = pct > 0 ? ('+' + pct) : String(pct);
+    const moodLabel =
+      v >=  0.6 ? 'חיובי מאוד' :
+      v >=  0.2 ? 'חיובי' :
+      v >  -0.2 ? 'מאוזן' :
+      v >  -0.6 ? 'שלילי' : 'שלילי מאוד';
+
+    const caption = opts.label || moodLabel;
+    const sub = opts.subtitle || '';
+
+    container.innerHTML = `
+      <div class="mood-gauge" role="img" aria-label="מצב רוח: ${caption}, ${pctText}">
+        <svg viewBox="0 0 ${W} ${H + 46}" width="100%" xmlns="http://www.w3.org/2000/svg" style="direction:ltr; height:auto;">
+          ${arcs}
+          <text x="${leftEnd.x}"  y="${leftEnd.y}"  fill="#ef4444" font-size="18" font-weight="800" text-anchor="middle">${leftEnd.text}</text>
+          <text x="${rightEnd.x}" y="${rightEnd.y}" fill="#10b981" font-size="18" font-weight="800" text-anchor="middle">${rightEnd.text}</text>
+          <polygon points="${baseLeftX.toFixed(1)},${baseLeftY.toFixed(1)} ${tipX.toFixed(1)},${tipY.toFixed(1)} ${baseRightX.toFixed(1)},${baseRightY.toFixed(1)}"
+                   fill="#104356" />
+          <circle cx="${cx}" cy="${cy}" r="10" fill="#fff" stroke="#104356" stroke-width="2.5" />
+          <text x="${cx}" y="${H + 22}" text-anchor="middle" font-size="26" font-weight="800" fill="#104356" style="direction:ltr;unicode-bidi:bidi-override;">${pctText}</text>
+          <text x="${cx}" y="${H + 40}" text-anchor="middle" font-size="13" font-weight="600" fill="#6b5ce7">${caption}</text>
+          ${sub ? `<text x="${cx}" y="${H + 55}" text-anchor="middle" font-size="11" fill="#94a3b8">${sub}</text>` : ''}
+        </svg>
+      </div>
+    `;
+  };
+
+  // Compute mood score in [-1, +1] from polarity distribution.
+  // (positive - negative) / total_meaningful,
+  // where total_meaningful = pos + neg + neu + mix (mix is 0-weighted).
+  window.MARAMARA.moodScoreFromPolarity = function (pd) {
+    pd = pd || {};
+    const pos = pd.positive || 0;
+    const neg = pd.negative || 0;
+    const neu = pd.neutral  || 0;
+    const mix = pd.mixed    || 0;
+    const total = pos + neg + neu + mix;
+    if (!total) return 0;
+    return (pos - neg) / total;
+  };
+})();
+</script>
+
+<style>
+  .mood-gauge {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+</style>

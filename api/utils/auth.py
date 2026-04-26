@@ -48,6 +48,15 @@ def verify_supabase_jwt(token: str) -> dict:
         raise AuthError("Invalid token")
     except jwt.PyJWTError as e:
         raise AuthError(f"Token validation failed: {e}") from e
+    except AuthError:
+        raise
+    except Exception as e:
+        # Supabase client can raise AuthApiError (expired/invalid) that isn't a PyJWTError.
+        # Normalise those to our AuthError so the web layer can redirect to /auth/login.
+        msg = str(e)
+        if "expired" in msg.lower():
+            raise AuthError("Session expired") from e
+        raise AuthError(f"Token validation failed: {msg}") from e
 
 
 def require_auth(f: Callable) -> Callable:

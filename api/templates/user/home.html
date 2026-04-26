@@ -2,62 +2,212 @@
 {% block title %}בית — MARAMARA{% endblock %}
 
 {% block content %}
-<section class="dashboard">
-  <header class="dashboard__header">
-    <h1>שלום, {{ session.user.full_name or session.user.email }}</h1>
-    <p class="dashboard__subtitle">זה מה שלמדת על עצמך היום</p>
+<section class="home">
+  <header class="home__hero">
+    <img class="home__mark" src="{{ url_for('static', filename='img/maramara-logo-icon.png') }}" alt="MARAMARA" />
+
+    <h1 class="home__greeting">שלום, {{ session.user.full_name.split()[0] if session.user.full_name else session.user.email.split('@')[0] }}</h1>
+    <p class="home__subtitle" id="homeSubtitle">מה שלי היום?</p>
   </header>
 
-  <div class="grid grid--4 dashboard__kpis">
-    <div class="kpi kpi--positive">
-      <span class="kpi__label">רגעי הקלה</span>
-      <span class="kpi__value" data-kpi="calming_count">—</span>
-    </div>
-    <div class="kpi kpi--negative">
-      <span class="kpi__label">טריגרים</span>
-      <span class="kpi__value" data-kpi="negative_count">—</span>
-    </div>
-    <div class="kpi">
-      <span class="kpi__label">עוצמה ממוצעת</span>
-      <span class="kpi__value" data-kpi="intensity_avg">—</span>
-    </div>
-    <div class="kpi">
-      <span class="kpi__label">שעת שיא</span>
-      <span class="kpi__value" data-kpi="peak_frustration_hour">—</span>
-    </div>
-  </div>
-
-  <section class="insight-block">
-    <h2>התובנה המרכזית שלך היום</h2>
-    <p class="insight-block__text" id="heroInsight">טוען...</p>
+  <section class="home__listen" aria-label="Start listening">
+    {% include 'partials/_orb.html' %}
+    <p class="home__listen-note" id="homeListenNote">מאזין רק כשאתה מדבר</p>
   </section>
 
-  <section class="grid grid--2 dashboard__panels">
-    <article class="panel">
-      <h3>מה הפעיל אותך</h3>
-      <p data-field="top_trigger_topic">—</p>
-    </article>
+  <section class="home__panel">
+    <header class="home__panel-head">
+      <h2>ציר זמן רגשי</h2>
+      <div class="range-tabs" role="tablist" aria-label="בחר טווח זמן">
+        <button class="range-tab" data-range="day" type="button">היום</button>
+        <button class="range-tab range-tab--active" data-range="week" type="button">שבוע</button>
+        <button class="range-tab" data-range="month" type="button">חודש</button>
+      </div>
+    </header>
+    <div class="week-chart" id="weekChart" aria-label="emotional trend"></div>
+    <div class="week-chart__legend">
+      <span class="dot dot--positive"></span> חיובי
+      <span class="dot dot--neutral"></span> ניטרלי
+      <span class="dot dot--negative"></span> שלילי
+    </div>
+    <a href="/dashboard/timeline" class="home__link home__link--end">לציר המלא ←</a>
+  </section>
 
-    <article class="panel">
-      <h3>מה הרגיע אותך</h3>
-      <p data-field="top_calming_topic">—</p>
-    </article>
+  <section class="home__panel">
+    <header class="home__panel-head">
+      <h2>ביטויים חוזרים השבוע</h2>
+    </header>
+    <div class="phrase-cloud" id="phraseCloud">
+      <p class="home__empty">עדיין לא זיהינו ביטויים חוזרים. הקלט קצת ואחזור.</p>
+    </div>
+  </section>
+
+  <section class="home__panel">
+    <header class="home__panel-head">
+      <h2>על מה דיברת</h2>
+    </header>
+    <div class="topic-grid" id="topicGrid">
+      <p class="home__empty">אין עדיין נושאים מסווגים.</p>
+    </div>
+  </section>
+
+  <section class="home__panel">
+    <header class="home__panel-head">
+      <h2>הקלטות אחרונות</h2>
+      <a href="/dashboard/recordings" class="home__link">לכל ההקלטות ←</a>
+    </header>
+    <ul class="recents" id="recentsList">
+      <li class="home__empty">טוען…</li>
+    </ul>
   </section>
 </section>
 
 <script>
-(async () => {
-  const res = await fetch('/dashboard/api/today', { credentials: 'include' });
-  const { data } = await res.json();
-  if (!data) return;
-  for (const [k, v] of Object.entries(data)) {
-    document.querySelectorAll(`[data-kpi="${k}"], [data-field="${k}"]`).forEach(el => {
-      el.textContent = v ?? '—';
+(function () {
+  const POLARITY_COLOR = {
+    positive: 'var(--color-success, #10b981)',
+    neutral:  'var(--text-muted, #64748b)',
+    negative: 'var(--error, #ef4444)',
+    mixed:    '#f59e0b',
+  };
+  const DAY_LABELS = ['א','ב','ג','ד','ה','ו','ש'];
+
+  const listenNote = document.getElementById('homeListenNote');
+  const subtitle = document.getElementById('homeSubtitle');
+  const orb = document.querySelector('[data-listen-toggle]');
+  if (!orb) return;
+
+  function syncListenState() {
+    const R = window.MARAMARA_RECORDER;
+    const active = R?.isActive();
+    document.querySelectorAll('[data-listen-toggle]').forEach(b => {
+      b.classList.toggle('listen-orb--active', !!active);
+      const lbl = b.querySelector('.listen-orb__label');
+      if (lbl) lbl.textContent = active ? 'עצור האזנה' : 'התחל האזנה';
     });
+    if (active && R) listenNote.textContent = `${R.getCount()} קטעים נשלחו היום`;
+    else listenNote.textContent = 'מאזין רק כשאתה מדבר';
   }
-  document.getElementById('heroInsight').textContent =
-    data.summary_text ||
-    'נתוני היום עדיין מצטברים. דבר באופן טבעי והאפליקציה תנתח ברקע.';
+  syncListenState();
+  window.addEventListener('maramara:stopped', syncListenState);
+  window.addEventListener('maramara:started', syncListenState);
+
+  let currentRange = 'week';
+
+  async function loadHome() {
+    try {
+      const res = await fetch(`/dashboard/api/home?range=${currentRange}`, { credentials: 'include' });
+      if (!res.ok) throw new Error('home api ' + res.status);
+      const { data } = await res.json();
+      renderChart(data.chart || [], currentRange);
+      renderPhrases(data.top_phrases || []);
+      renderTopics(data.top_topics || []);
+      renderRecents(data.recents || []);
+      renderGreetingContext(data);
+    } catch (err) {
+      console.error('home load failed', err);
+    }
+  }
+
+  // Time range tab switching
+  document.querySelectorAll('.range-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.range-tab').forEach(t => t.classList.remove('range-tab--active'));
+      tab.classList.add('range-tab--active');
+      currentRange = tab.dataset.range;
+      loadHome();
+    });
+  });
+
+  function renderChart(rows, range) {
+    const el = document.getElementById('weekChart');
+    el.innerHTML = '';
+    if (!rows.length) {
+      el.innerHTML = '<p class="home__empty">אין עדיין נתונים לטווח הזה.</p>';
+      return;
+    }
+    const maxIntensity = Math.max(...rows.map(d => d.intensity_avg || 0), 1);
+    for (const row of rows) {
+      const intensity = row.intensity_avg || 0;
+      const height = Math.max(6, Math.round((intensity / maxIntensity) * 100));
+      const pol = (row.negative_count || 0) > (row.positive_count || 0) ? 'negative'
+                : (row.positive_count || 0) > (row.negative_count || 0) ? 'positive' : 'neutral';
+      const bar = document.createElement('div');
+      bar.className = 'week-chart__bar';
+      bar.innerHTML = `
+        <span class="week-chart__fill" style="height:${height}%; background:${POLARITY_COLOR[pol]}"></span>
+        <span class="week-chart__label">${escapeHtml(row.label || '')}</span>
+      `;
+      bar.title = `${row.label}: עוצמה ${intensity.toFixed ? intensity.toFixed(1) : intensity}`;
+      el.appendChild(bar);
+    }
+  }
+
+  function renderPhrases(phrases) {
+    const el = document.getElementById('phraseCloud');
+    if (!phrases.length) return;
+    el.innerHTML = phrases.map(p => {
+      const cls = p.type === 'negative' || p.type === 'curse' ? 'chip chip--negative'
+                : p.type === 'positive' || p.type === 'calming' ? 'chip chip--positive'
+                : 'chip';
+      return `<span class="${cls}"><b>${escapeHtml(p.term)}</b><small>×${p.count}</small></span>`;
+    }).join('');
+  }
+
+  function renderTopics(topics) {
+    const el = document.getElementById('topicGrid');
+    if (!topics.length) return;
+    el.innerHTML = topics.map(t => `
+      <article class="topic-card">
+        <span class="topic-card__name">${escapeHtml(t.topic)}</span>
+        <span class="topic-card__count">${t.count} פעמים</span>
+      </article>
+    `).join('');
+  }
+
+  function renderRecents(recents) {
+    const el = document.getElementById('recentsList');
+    if (!recents.length) {
+      el.innerHTML = '<li class="home__empty">עוד לא הקלטת היום. בוא נתחיל?</li>';
+      return;
+    }
+    el.innerHTML = recents.map(r => {
+      const time = new Date(r.started_at).toLocaleString('he-IL', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' });
+      const pol = r.analysis?.polarity || 'neutral';
+      const text = r.transcript?.transcript_text || '(אין תמלול)';
+      return `
+        <li class="recent">
+          <span class="recent__dot dot--${pol}"></span>
+          <div class="recent__body">
+            <div class="recent__meta">${time} · ${escapeHtml(r.analysis?.primary_topic || 'לא סווג')}</div>
+            <div class="recent__text">${escapeHtml(text.slice(0, 120))}${text.length > 120 ? '…' : ''}</div>
+          </div>
+        </li>
+      `;
+    }).join('');
+  }
+
+  function renderGreetingContext(data) {
+    const n = data.total_week_segments || 0;
+    if (n === 0) {
+      subtitle.textContent = 'עוד לא הקלטת השבוע. לחץ על הכפתור כדי להתחיל.';
+    } else {
+      subtitle.textContent = `${n} קטעים נותחו השבוע`;
+    }
+  }
+
+  function escapeHtml(s) {
+    return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  // Cleanup on SPA navigation away
+  function cleanup() {
+    window.removeEventListener('maramara:stopped', syncListenState);
+    window.removeEventListener('maramara:navigated', cleanup);
+  }
+  window.addEventListener('maramara:navigated', cleanup);
+
+  loadHome();
 })();
 </script>
 {% endblock %}

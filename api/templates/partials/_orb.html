@@ -1,0 +1,18 @@
+{# Reusable listen orb — identical UI on both home and listen pages.
+   The rings sit around the button (inset: -Npx). The equalizer lives
+   BELOW the orb on the page background (visible only while recording). #}
+<div class="listen-orb-wrap">
+  <span class="listen-orb__ring"></span>
+  <span class="listen-orb__ring listen-orb__ring--2"></span>
+  <button id="{{ id | default('listenOrb') }}" class="listen-orb" type="button"
+          data-listen-toggle aria-label="Toggle listening">
+    <span class="listen-orb__core">
+      <svg class="listen-orb__icon" width="48" height="48" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="M12 3a4 4 0 0 0-4 4v5a4 4 0 0 0 8 0V7a4 4 0 0 0-4-4z" fill="currentColor"/>
+        <path d="M5 11a1 1 0 0 1 2 0 5 5 0 0 0 10 0 1 1 0 1 1 2 0 7 7 0 0 1-6 6.93V20h3a1 1 0 1 1 0 2H8a1 1 0 1 1 0-2h3v-2.07A7 7 0 0 1 5 11z" fill="currentColor"/>
+      </svg>
+      <span class="listen-orb__label">התחל האזנה</span>
+    </span>
+  </button>
+</div>
+<canvas class="listen-orb__eq" width="640" height="80" aria-hidden="true"></canvas>
